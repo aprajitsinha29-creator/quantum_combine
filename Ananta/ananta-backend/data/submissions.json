@@ -1,0 +1,41 @@
+[
+  {
+    "id": "sub_init_01",
+    "studentId": "std_ananya_01",
+    "studentName": "Ananya Sharma",
+    "cohortId": "cohort_qc101",
+    "assignmentId": "asg_01_bell",
+    "type": "circuit",
+    "fidelity": 0.999,
+    "gateCount": 2,
+    "grade": 100,
+    "passed": true,
+    "submittedAt": "2026-09-08T12:53:16.946Z"
+  },
+  {
+    "id": "sub_init_02",
+    "studentId": "std_rohan_02",
+    "studentName": "Rohan Verma",
+    "cohortId": "cohort_qc101",
+    "assignmentId": "asg_01_bell",
+    "type": "circuit",
+    "fidelity": 0.995,
+    "gateCount": 2,
+    "grade": 98,
+    "passed": true,
+    "submittedAt": "2026-09-09T12:53:16.946Z"
+  },
+  {
+    "id": "sub_1789131510010_szvf",
+    "studentId": "std_live_test",
+    "studentName": "Live Test Scholar",
+    "cohortId": "cohort_qc101",
+    "assignmentId": "quiz_general",
+    "type": "quiz",
+    "score": 0,
+    "percentage": 0,
+    "passed": false,
+    "xpEarned": 0,
+    "submittedAt": "2026-09-11T12:58:30.011Z"
+  }
+]

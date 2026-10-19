@@ -1,0 +1,74 @@
+[
+  {
+    "id": "std_ananya_01",
+    "cohortId": "cohort_qc101",
+    "name": "Ananya Sharma",
+    "email": "ananya.sharma@ananta.edu",
+    "challengesSolved": 7,
+    "quizzesCompleted": 4,
+    "avgScore": 92,
+    "totalXp": 850,
+    "letterGrade": "A",
+    "lastActive": "2026-09-11T10:53:16.944Z"
+  },
+  {
+    "id": "std_rohan_02",
+    "cohortId": "cohort_qc101",
+    "name": "Rohan Verma",
+    "email": "rohan.verma@ananta.edu",
+    "challengesSolved": 5,
+    "quizzesCompleted": 3,
+    "avgScore": 84,
+    "totalXp": 620,
+    "letterGrade": "B",
+    "lastActive": "2026-09-11T07:53:16.944Z"
+  },
+  {
+    "id": "std_priya_03",
+    "cohortId": "cohort_qc101",
+    "name": "Priya Patel",
+    "email": "priya.patel@ananta.edu",
+    "challengesSolved": 8,
+    "quizzesCompleted": 5,
+    "avgScore": 96,
+    "totalXp": 1100,
+    "letterGrade": "A",
+    "lastActive": "2026-09-11T11:53:16.944Z"
+  },
+  {
+    "id": "std_aarav_04",
+    "cohortId": "cohort_algo502",
+    "name": "Aarav Nair",
+    "email": "aarav.nair@ananta.edu",
+    "challengesSolved": 6,
+    "quizzesCompleted": 3,
+    "avgScore": 78,
+    "totalXp": 540,
+    "letterGrade": "C",
+    "lastActive": "2026-09-11T00:53:16.944Z"
+  },
+  {
+    "id": "std_ishita_05",
+    "cohortId": "cohort_algo502",
+    "name": "Ishita Sen",
+    "email": "ishita.sen@ananta.edu",
+    "challengesSolved": 8,
+    "quizzesCompleted": 4,
+    "avgScore": 94,
+    "totalXp": 980,
+    "letterGrade": "A",
+    "lastActive": "2026-09-11T08:53:16.944Z"
+  },
+  {
+    "id": "std_live_test",
+    "cohortId": "cohort_qc101",
+    "name": "Live Test Scholar",
+    "email": "std_live_test@ananta.edu",
+    "challengesSolved": 0,
+    "quizzesCompleted": 1,
+    "avgScore": 0,
+    "totalXp": 0,
+    "letterGrade": "F",
+    "lastActive": "2026-09-11T12:58:30.012Z"
+  }
+]

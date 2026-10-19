@@ -1,0 +1,49 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/gemini",
+      "destination": "/api/gemini.js"
+    },
+    {
+      "source": "/api/ai",
+      "destination": "/api/gemini.js"
+    },
+    {
+      "source": "/api/ai/tutor",
+      "destination": "/api/gemini.js"
+    },
+    {
+      "source": "/api/grok",
+      "destination": "/api/gemini.js"
+    },
+    {
+      "source": "/api/knowledge/(.*)",
+      "destination": "/api/gemini.js"
+    },
+    {
+      "source": "/api/knowledge",
+      "destination": "/api/gemini.js"
+    },
+    {
+      "source": "/api/qbraid/(.*)",
+      "destination": "/api/qbraid.js"
+    },
+    {
+      "source": "/api/qbraid",
+      "destination": "/api/qbraid.js"
+    },
+    {
+      "source": "/api/transpiler/(.*)",
+      "destination": "/api/transpiler.js"
+    },
+    {
+      "source": "/api/transpiler",
+      "destination": "/api/transpiler.js"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
+    }
+  ]
+}

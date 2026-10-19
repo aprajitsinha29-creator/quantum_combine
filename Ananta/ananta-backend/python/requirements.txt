@@ -1,0 +1,21 @@
+# Real quantum SDKs used by quantum_multiframework_runner.py for genuine
+# Qiskit Aer / Cirq / PennyLane circuit execution (not code export - actual
+# simulation). Install with: pip install -r ananta-backend/python/requirements.txt
+#
+# Verified working together on Python 3.12 during development. Qiskit's
+# 2.x line has had import-time incompatibilities with some Python 3.10
+# typing internals on certain platforms - if you hit that, use Python 3.11+
+# (or set ANANTA_PYTHON_BIN to an interpreter where these imports succeed).
+qiskit>=1.0
+qiskit-aer>=0.17
+cirq>=1.5
+ply>=3.11
+pennylane>=0.42
+pennylane-qiskit>=0.42
+
+# HTTP service wrapper (app.py) for deploying this as a standalone,
+# always-on service that Vercel's serverless functions call over HTTPS -
+# see app.py's module docstring for why this can't run inside a Vercel
+# Node function directly.
+fastapi>=0.110
+uvicorn[standard]>=0.29

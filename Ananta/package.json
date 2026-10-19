@@ -1,0 +1,15 @@
+{
+  "name": "ananta-quantum-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ananta Quantum Studio — server.js (local dev) and api/*.js (Vercel serverless) share these dependencies.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "pdf-parse": "^1.1.1",
+    "pg": "^8.23.0"
+  }
+}

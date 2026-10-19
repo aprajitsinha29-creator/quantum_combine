@@ -1,0 +1,29 @@
+[
+  {
+    "id": "cohort_qc101",
+    "code": "QC-101",
+    "name": "Introduction to Quantum Information & Circuits",
+    "instructor": "Dr. Vikram Sarabhai",
+    "term": "Fall 2026",
+    "description": "Undergraduate core course on linear algebra in Hilbert spaces, Pauli gates, Bell states, and Deutsch-Jozsa algorithm.",
+    "createdAt": "2026-08-12T12:53:16.942Z"
+  },
+  {
+    "id": "cohort_algo502",
+    "code": "CS-502",
+    "name": "Advanced Quantum Algorithms & Fault-Tolerance",
+    "instructor": "Prof. C. V. Raman",
+    "term": "Fall 2026",
+    "description": "Graduate seminar covering Grover search amplitude amplification, Shor QFT, VQE chemistry, and rotated surface code decoders.",
+    "createdAt": "2026-08-22T12:53:16.942Z"
+  },
+  {
+    "id": "cohort_mtwyiqsd_hkm",
+    "code": "TEST-QC",
+    "name": "Test Experimental Quantum Lab",
+    "instructor": "Dr. Test",
+    "term": "Fall 2026",
+    "description": "Unit test cohort",
+    "createdAt": "2026-09-11T12:53:16.957Z"
+  }
+]

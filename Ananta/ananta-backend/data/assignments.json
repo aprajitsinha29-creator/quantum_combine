@@ -1,0 +1,37 @@
+[
+  {
+    "id": "asg_01_bell",
+    "cohortId": "cohort_qc101",
+    "title": "Laboratory 1: Bell State |Φ+⟩ Synthesis",
+    "type": "circuit",
+    "targetState": "|Φ+⟩ = (|00⟩ + |11⟩) / √2",
+    "minFidelity": 0.98,
+    "maxGates": 3,
+    "dueDate": "2026-09-18T12:53:16.945Z",
+    "points": 100,
+    "submissionsCount": 3
+  },
+  {
+    "id": "asg_02_gates_quiz",
+    "cohortId": "cohort_qc101",
+    "title": "Assessment 1: Unitaries & Phase Kickback Quiz",
+    "type": "quiz",
+    "topic": "gates",
+    "minPassPercentage": 70,
+    "dueDate": "2026-09-21T12:53:16.945Z",
+    "points": 100,
+    "submissionsCount": 3
+  },
+  {
+    "id": "asg_03_grover",
+    "cohortId": "cohort_algo502",
+    "title": "Laboratory 3: Grover Diffusion Operator Implementation",
+    "type": "circuit",
+    "targetState": "Single target constructive amplification (>70%)",
+    "minFidelity": 0.95,
+    "maxGates": 12,
+    "dueDate": "2026-09-16T12:53:16.945Z",
+    "points": 150,
+    "submissionsCount": 2
+  }
+]

@@ -1,0 +1,39 @@
+.DS_Store
+Thumbs.db
+.DS_Store
+Thumbs.db
+*.log
+*.crt
+*.pem
+*.cer
+node_modules/
+
+# Local API Keys and secrets
+.env
+.env.*
+*.env
+*.local
+# js/config.js included for deployment
+
+# Python virtual environment & database
+.venv/
+.cache/
+__pycache__/
+*.pyc
+*.db
+*.pdf
+
+# Real user accounts & session-signing secret - never commit real credentials
+ananta-backend/data/users.json
+ananta-backend/data/.session_secret
+
+# Local secrets (DATABASE_URL, GEMINI_API_KEY, etc) - paste real values into
+# .env, never commit it. .env.example is the committed template.
+.env
+.env.local
+
+# SIH Presentation slides and assets (Local only - do not push)
+sih_*.png
+scripts/generate_sih_feasibility_slides.py
+scripts/generate_feature_architecture_pdf.py
+
