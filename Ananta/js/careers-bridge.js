@@ -104,4 +104,88 @@
   window.addEventListener('ananta:mission-solved', function () {
     sendProgress();
   });
+
+  /*
+   * Careers dropdown route handling. The five menu items point at QPath
+   * pages inside the #view-careers iframe; QPath's router wants a clean
+   * path (e.g. /diagnostic), not an Ananta hash. Route changes therefore
+   * simply set iframe.src — no extra message types, and Ananta's existing
+   * click handler (data-tab="careers") still opens the view because we
+   * never preventDefault here. The dropdown does not follow navigation
+   * made inside QPath; it only tracks the last route opened from Ananta.
+   *
+   * Safety: urls are only ever built from this hardcoded allowlist, never
+   * from arbitrary DOM input.
+   */
+  var CAREER_ROUTES = ['/pulse', '/diagnostic', '/paths', '/opportunities', '/method'];
+
+  /** QPath page path last opened from Ananta (used by the hashchange refresh). */
+  var lastOpenedRoute = null;
+
+  /**
+   * Load a QPath page in the Careers iframe. Routes outside the allowlist
+   * are ignored. Always assigns iframe.src, even for the same route: the
+   * user may have navigated inside QPath since the last open, and a reload
+   * is accepted (the qpath:ready handshake re-sends progress).
+   */
+  function openCareersRoute(route) {
+    if (CAREER_ROUTES.indexOf(route) === -1) return;
+    var frame = careersFrame();
+    if (!frame) return;
+    lastOpenedRoute = route;
+    frame.src = QPATH_ORIGIN + route;
+  }
+
+  /**
+   * Highlight ONLY the careers menu item matching the opened route (desktop
+   * and mobile). Ananta's generic code marks all five active because they
+   * share data-tab="careers", so clear siblings everywhere before marking.
+   */
+  function markActiveRoute(route) {
+    var items = document.querySelectorAll('[data-careers-route]');
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].getAttribute('data-careers-route') === route) {
+        items[i].classList.add('active');
+      } else {
+        items[i].classList.remove('active');
+      }
+    }
+  }
+
+  /** True while the Careers view is the visible viewport-section. */
+  function careersViewIsActive() {
+    return document.querySelector('#view-careers.active');
+  }
+
+  // Delegated listener: catches desktop dropdown items and mobile drawer
+  // items alike. Ananta's own handler opens the view via data-tab; we only
+  // point the iframe at the right QPath page and then (after that handler
+  // ran) fix up the active highlighting that would otherwise mark all five.
+  document.addEventListener('click', function (event) {
+    var target = event.target;
+    while (target && target !== document.body) {
+      if (target.hasAttribute && target.hasAttribute('data-careers-route')) {
+        openCareersRoute(target.getAttribute('data-careers-route'));
+        setTimeout(function () {
+          if (lastOpenedRoute && careersViewIsActive()) {
+            markActiveRoute(lastOpenedRoute);
+          }
+        }, 0);
+        break;
+      }
+      target = target.parentNode;
+    }
+  });
+
+  // Keep the highlight consistent on back/forward: re-mark the last opened
+  // route when Careers is the active view; otherwise do nothing.
+  window.addEventListener('hashchange', function () {
+    if (lastOpenedRoute && careersViewIsActive()) {
+      setTimeout(function () {
+        if (lastOpenedRoute && careersViewIsActive()) {
+          markActiveRoute(lastOpenedRoute);
+        }
+      }, 0);
+    }
+  });
 })();
