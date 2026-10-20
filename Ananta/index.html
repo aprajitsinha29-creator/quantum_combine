@@ -51,7 +51,59 @@
         <a href="#simulator" class="nav-item" data-tab="simulator">Composer</a>
 
         <!-- Careers: embeds the QPath frontend (http://localhost:5173) -->
-        <a href="#careers" class="nav-item" data-tab="careers">Careers</a>
+        <div class="nav-dropdown-item" data-dropdown-group="careers">
+          <button type="button" class="nav-item nav-dropdown-trigger" data-dropdown="careers" aria-expanded="false">
+            Careers <span class="nav-caret">▾</span>
+          </button>
+          <div class="nav-dropdown-menu nav-dropdown-learn">
+            <div class="nav-dropdown-header">QPath · Careers &amp; Opportunities</div>
+            <a href="#careers" class="dropdown-rich-item" data-tab="careers" data-careers-route="/pulse">
+              <span class="dropdown-rich-icon">📈</span>
+              <div class="dropdown-rich-info">
+                <div class="dropdown-rich-title-line">
+                  <span class="dropdown-rich-title">Market Pulse</span>
+                </div>
+                <span class="dropdown-rich-desc">Live quantum posting volume per subfield, ranked hiring demand</span>
+              </div>
+            </a>
+            <a href="#careers" class="dropdown-rich-item" data-tab="careers" data-careers-route="/diagnostic">
+              <span class="dropdown-rich-icon">🧭</span>
+              <div class="dropdown-rich-info">
+                <div class="dropdown-rich-title-line">
+                  <span class="dropdown-rich-title">Skills Diagnostic</span>
+                </div>
+                <span class="dropdown-rich-desc">Interest & skill questions scored into readiness per subfield</span>
+              </div>
+            </a>
+            <a href="#careers" class="dropdown-rich-item" data-tab="careers" data-careers-route="/paths">
+              <span class="dropdown-rich-icon">🛤️</span>
+              <div class="dropdown-rich-info">
+                <div class="dropdown-rich-title-line">
+                  <span class="dropdown-rich-title">Career Paths</span>
+                </div>
+                <span class="dropdown-rich-desc">Rank paths by your interest, field demand & readiness score</span>
+              </div>
+            </a>
+            <a href="#careers" class="dropdown-rich-item" data-tab="careers" data-careers-route="/opportunities">
+              <span class="dropdown-rich-icon">💼</span>
+              <div class="dropdown-rich-info">
+                <div class="dropdown-rich-title-line">
+                  <span class="dropdown-rich-title">Opportunities</span>
+                </div>
+                <span class="dropdown-rich-desc">Job listings matched to your tracked career path & region</span>
+              </div>
+            </a>
+            <a href="#careers" class="dropdown-rich-item" data-tab="careers" data-careers-route="/method">
+              <span class="dropdown-rich-icon">⚙️</span>
+              <div class="dropdown-rich-info">
+                <div class="dropdown-rich-title-line">
+                  <span class="dropdown-rich-title">How it works</span>
+                </div>
+                <span class="dropdown-rich-desc">Where the market data comes from and what the AI may do</span>
+              </div>
+            </a>
+          </div>
+        </div>
 
         <!-- 3. Quantum Studios Dropdown (FTQC, Pulse, Transpiler, VQE) -->
         <div class="nav-dropdown-item" data-dropdown-group="studios">
@@ -287,7 +339,13 @@
     <div class="mobile-nav-section-title">CORE WORKSPACE</div>
     <a href="#overview" class="mobile-nav-item" data-tab="overview" onclick="window.closeMobileNav()">🏠 Overview</a>
     <a href="#simulator" class="mobile-nav-item" data-tab="simulator" onclick="window.closeMobileNav()">⚛️ Composer</a>
-    <a href="#careers" class="mobile-nav-item" data-tab="careers" onclick="window.closeMobileNav()">💼 Careers</a>
+    <!-- QPath careers pages for the embedded Careers tab -->
+    <div class="mobile-nav-section-title">CAREERS (QPATH)</div>
+    <a href="#careers" class="mobile-nav-item" data-tab="careers" data-careers-route="/pulse" onclick="window.closeMobileNav()">📈 Market Pulse</a>
+    <a href="#careers" class="mobile-nav-item" data-tab="careers" data-careers-route="/diagnostic" onclick="window.closeMobileNav()">🧭 Skills Diagnostic</a>
+    <a href="#careers" class="mobile-nav-item" data-tab="careers" data-careers-route="/paths" onclick="window.closeMobileNav()">🛤️ Career Paths</a>
+    <a href="#careers" class="mobile-nav-item" data-tab="careers" data-careers-route="/opportunities" onclick="window.closeMobileNav()">💼 Opportunities</a>
+    <a href="#careers" class="mobile-nav-item" data-tab="careers" data-careers-route="/method" onclick="window.closeMobileNav()">⚙️ How it works</a>
 
     <!-- Category: Quantum Studios -->
     <div class="mobile-nav-section-title">QUANTUM STUDIOS</div>
