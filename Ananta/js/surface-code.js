@@ -281,6 +281,14 @@ class SurfaceCodeStudio {
       this.historyStats.correctedCount++;
       this.setStatus(`✅ All syndromes successfully annihilated! Logical state |ψ_L⟩ preserved with 100% fidelity.`, 'success');
       this.logSyndromeEvent(`Decoder successfully matched and corrected ${correctionsApplied} qubits without logical error.`);
+      // Report a real, checkable success ONLY here: reaching this branch means
+      // the decoder matched and applied corrections that annihilated the
+      // syndrome without a logical flip. The 'code space is clean' early
+      // return and the logical-error branch above both skip this — a clean
+      // lattice or a failed decode proves nothing for the careers bridge.
+      if (correctionsApplied >= 2) {
+        window.dispatchEvent(new CustomEvent('ananta:achievement', { detail: { id: 'surface_decode' } }));
+      }
     }
   }
 
