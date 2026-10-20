@@ -1,16 +1,25 @@
-// Renders application shell with header navigation, health badge, and routed
-// main content. The Opportunities nav item is enabled only once a path is
-// tracked (plan 5.5); it reads GET /profiles/{id} via useChosenPath and
-// renders a non-clickable hint otherwise.
+// Renders application shell with header navigation, health badge, the
+// Ananta import notice (Tier 2), and routed main content. The Opportunities
+// nav item is enabled only once a path is tracked (plan 5.5); it reads
+// GET /profiles/{id} via useChosenPath and renders a non-clickable hint
+// otherwise.
 import { NavLink, Outlet } from 'react-router-dom';
 import { HealthBadge } from '../../features/health/components/HealthBadge';
 import { useChosenPath } from '../../features/tracker/hooks/useTracker';
 import { getOrCreateProfileId } from '../../lib/profileId';
+import { useAnantaBridge } from '../../features/ananta/useAnantaBridge';
 
 export function AppShell() {
   const profileId = getOrCreateProfileId();
   const { data: chosenPath } = useChosenPath(profileId);
   const pathTracked = Boolean(chosenPath?.chosen_path_id);
+
+  // Tier 2 handoff: skills imported from Ananta missions (no-op standalone).
+  const { imported, dismiss } = useAnantaBridge();
+  const importedSummary =
+    imported.length === 1
+      ? `Imported 1 skill from Ananta: ${imported[0]}`
+      : `Imported ${imported.length} skills from Ananta: ${imported.join(', ')}`;
 
   const navLinkClasses = ({ isActive }: { isActive: boolean }) =>
     `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -81,6 +90,27 @@ export function AppShell() {
           </div>
         </div>
       </header>
+
+      {/* Ananta import notice: shown only right after skills arrive from the
+          parent page; dismiss clears the text so reloads cannot duplicate it. */}
+      {imported.length > 0 && (
+        <div
+          role="status"
+          className="mx-auto w-full max-w-7xl mt-4 flex items-center justify-between gap-3 rounded-md border border-cyan-800 bg-cyan-950 px-4 py-2 text-sm text-cyan-200"
+        >
+          <span>
+            {importedSummary}
+          </span>
+          <button
+            type="button"
+            onClick={dismiss}
+            aria-label="Dismiss the Ananta import notice"
+            className="rounded-md px-2 py-1 text-xs font-medium text-slate-300 hover:bg-slate-900 hover:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
