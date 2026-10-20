@@ -264,6 +264,8 @@ document.addEventListener('DOMContentLoaded', () => {
         item.classList.add('active');
       } else if (dropdown === 'learn' && learnTabs.includes(tabKey)) {
         item.classList.add('active');
+      } else if (dropdown === 'careers' && tabKey === 'careers') {
+        item.classList.add('active');
       } else {
         item.classList.remove('active');
       }
@@ -537,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const validAllTabs = [
     'overview', 'simulator', 'surface-code', 'pulse-studio',
     'transpiler', 'vqe-chemistry', 'algorithms', 'research',
-    'intuition', 'challenges', 'docs', 'login', 'topic-roadmap'
+    'intuition', 'challenges', 'docs', 'login', 'topic-roadmap', 'careers'
   ];
 
   // Listen for browser hash changes (back/forward or URL typing)
