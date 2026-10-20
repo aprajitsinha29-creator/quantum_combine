@@ -7,9 +7,9 @@
  * 'qpath:ready' after mounting and on reloads; this file only READS local
  * progress and SENDS it — it never clears or resets anything.
  *
- * Honest note: only two QPath skills are reachable from Ananta's missions, so
- * this is a real but small handoff. No globals are added; everything lives in
- * this IIFE.
+ * Honest note: four QPath skills are reachable — two via missions and two
+ * via achievement events fired by the studio scripts on real successes.
+ * No globals are added; everything lives in this IIFE.
  */
 (function () {
   'use strict';
@@ -21,18 +21,43 @@
   // Mission-progress storage written by MissionManager.markMissionSolved.
   var STORAGE_KEY = 'ananta_completed_missions_v2';
 
+  // Achievement counters written by this file only; studio scripts just fire
+  // 'ananta:achievement' events when a real, checkable success happens.
+  var ACHIEVEMENTS_KEY = 'ananta_achievements_v1';
+
+  // Caps storage growth: a counter can only reach 100, so a runaway event
+  // loop cannot bloat localStorage.
+  var ACHIEVEMENT_COUNT_MAX = 100;
+
   /*
-   * Which missions exercise which QPath skill:
+   * One declarative rule per QPath skill. A skill is earned once its
+   * evidence count reaches the required amount:
+   *
+   * Missions (ids are the mission numbers used in algorithms.js):
    *   1 coin flip, 4 interference, 6 phase  -> quantum_mechanics
    *   2 Bell, 5 GHZ, 7 W, 8 Grover          -> quantum_information
-   * Mission 3 (NOT gate) maps to nothing. A skill needs 2 completed missions
-   * so it is earned, not given for a single click.
+   * Mission 3 (NOT gate) maps to nothing. Each mission skill needs 2
+   * completed missions so it is earned, not given for a single click.
+   *
+   * Achievements (events fired by studio scripts on real successes):
+   *   surface_decode: the surface-code studio's decoder freed the lattice of
+   *     defects WITHOUT a logical error and applied >= 2 corrections —
+   *     proof the learner actually used the decoder, not a clean click.
+   *   vqe_chem_acc: the VQE studio reached chemical accuracy with noise OFF,
+   *     once per page load — proof of a converged optimisation run.
    */
-  var SKILL_MISSIONS = {
-    quantum_mechanics: [1, 4, 6],
-    quantum_information: [2, 5, 7, 8],
-  };
-  var MISSIONS_REQUIRED = 2;
+  var SKILL_RULES = [
+    { skill: 'quantum_mechanics', missions: [1, 4, 6], requiredMissions: 2 },
+    { skill: 'quantum_information', missions: [2, 5, 7, 8], requiredMissions: 2 },
+    { skill: 'surface_codes', achievement: 'surface_decode', requiredAchievements: 2 },
+    { skill: 'variational_algorithms', achievement: 'vqe_chem_acc', requiredAchievements: 1 },
+  ];
+
+  // The achievement ids this bridge understands, derived from the rules so
+  // there is a single source of truth (junk events are filtered against it).
+  var ACHIEVEMENT_IDS = SKILL_RULES
+    .filter(function (rule) { return rule.achievement; })
+    .map(function (rule) { return rule.achievement; });
 
   /**
    * Read the completed mission ids from localStorage.
@@ -52,17 +77,45 @@
   }
 
   /**
-   * Skill ids whose mission list has at least MISSIONS_REQUIRED ids present
-   * in the given missions array.
+   * Read the achievement counters from localStorage.
+   * Returns only an object of id -> positive integer; anything else (missing,
+   * malformed, non-JSON, wrong types, non-integer or non-positive counts)
+   * becomes an empty object.
    */
-  function earnedSkills(missions) {
-    return Object.keys(SKILL_MISSIONS).filter(function (skill) {
-      var needed = SKILL_MISSIONS[skill];
-      var done = needed.filter(function (id) {
+  function achievementCounts() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(ACHIEVEMENTS_KEY) || '{}');
+      var counts = {};
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        for (var id in raw) {
+          if (ACHIEVEMENT_IDS.indexOf(id) !== -1 &&
+              typeof raw[id] === 'number' &&
+              Number.isInteger(raw[id]) &&
+              raw[id] > 0) {
+            counts[id] = raw[id];
+          }
+        }
+      }
+      return counts;
+    } catch (err) {
+      return {};
+    }
+  }
+
+  /**
+   * Skill ids whose evidence (completed missions or achievement counts)
+   * has reached the required amount. Pure: same inputs, same outputs.
+   */
+  function earnedSkills(missions, achievements) {
+    return SKILL_RULES.filter(function (rule) {
+      if (rule.achievement) {
+        return (achievements[rule.achievement] || 0) >= rule.requiredAchievements;
+      }
+      var done = rule.missions.filter(function (id) {
         return missions.indexOf(id) !== -1;
       });
-      return done.length >= MISSIONS_REQUIRED;
-    });
+      return done.length >= rule.requiredMissions;
+    }).map(function (rule) { return rule.skill; });
   }
 
   /** The Careers iframe (its contentWindow is the QPath child window). */
@@ -83,7 +136,7 @@
       {
         type: 'ananta:progress',
         version: 1,
-        skills: earnedSkills(missions),
+        skills: earnedSkills(missions, achievementCounts()),
         missions: missions,
       },
       QPATH_ORIGIN,
