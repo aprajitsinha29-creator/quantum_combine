@@ -21,6 +21,9 @@ htmlcov/
 # Generated database files live here (gitignored per plan)
 data/
 backend/data/
+# ...but the committed reference seed JSON must always be tracked, so the
+# backend/app/data directory is re-included after the data/ rules above.
+!backend/app/data/
 
 # Frontend (Phase 0 step 0.6+)
 node_modules/

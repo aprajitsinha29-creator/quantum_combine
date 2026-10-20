@@ -1,5 +1,6 @@
 # Quantum demo stack: never track data, caches or env files.
-data/
+# Root runtime database folder only.
+/data/
 .vite/
 *.db
 *.db-wal
