@@ -2442,6 +2442,9 @@ class MissionManager {
       localStorage.setItem('ananta_completed_missions_v2', JSON.stringify(saved));
     }
 
+    // Careers bridge (careers-bridge.js) listens for this to push progress to QPath.
+    window.dispatchEvent(new CustomEvent('ananta:mission-solved'));
+
     // Award XP
     let currentXp = parseInt(localStorage.getItem('ananta_xp') || '0', 10);
     currentXp += m.xp;
