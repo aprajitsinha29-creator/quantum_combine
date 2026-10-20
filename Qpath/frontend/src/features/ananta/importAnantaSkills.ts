@@ -104,10 +104,7 @@ export async function importAnantaSkills(
 
   // PUT replaces the whole list: existing skills first (order preserved),
   // then the newly earned ones appended.
-  const saved = await putDeclaredSkills(profileId, [
-    ...profile.declared_skills,
-    ...newIds,
-  ]);
+  const saved = await putDeclaredSkills(profileId, [...profile.declared_skills, ...newIds]);
 
   // Mirror useSaveDeclaredSkills so Paths/Opportunities stay in lockstep.
   queryClient.setQueryData<ProfileResponse>(profileQueryKey(profileId), saved);

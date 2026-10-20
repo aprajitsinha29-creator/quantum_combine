@@ -20,7 +20,12 @@ import { useAnantaBridge } from './useAnantaBridge';
 const mockImport = vi.mocked(importAnantaSkills);
 
 const ANANTA_ORIGIN = 'http://localhost:5500';
-const PROGRESS = { type: 'ananta:progress', version: 1, skills: ['quantum_mechanics'], missions: [1] };
+const PROGRESS = {
+  type: 'ananta:progress',
+  version: 1,
+  skills: ['quantum_mechanics'],
+  missions: [1],
+};
 
 function makeClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -57,11 +62,7 @@ function renderBridge(client: QueryClient) {
 }
 
 /** Window-source MessageEvent; source coerced because jsdom accepts any here. */
-function messageFrom(
-  origin: string,
-  source: unknown,
-  data: unknown,
-): MessageEvent {
+function messageFrom(origin: string, source: unknown, data: unknown): MessageEvent {
   const event = new MessageEvent('message', { origin, data });
   Object.defineProperty(event, 'source', { value: source });
   return event;
@@ -73,10 +74,7 @@ describe('useAnantaBridge', () => {
     stubParent(parent as Partial<Window>);
     renderBridge(makeClient());
     expect(parent.postMessage).toHaveBeenCalledTimes(1);
-    expect(parent.postMessage).toHaveBeenCalledWith(
-      { type: 'qpath:ready' },
-      ANANTA_ORIGIN,
-    );
+    expect(parent.postMessage).toHaveBeenCalledWith({ type: 'qpath:ready' }, ANANTA_ORIGIN);
   });
 
   it('test_valid_message_triggers_one_import_and_sets_names', async () => {

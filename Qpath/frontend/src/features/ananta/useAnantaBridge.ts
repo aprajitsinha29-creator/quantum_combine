@@ -26,10 +26,7 @@ const anantaOrigin =
  * stale PUT could otherwise drop a newer skill). Every link catches its own
  * error and the chain continues; an import failure must never break QPath.
  */
-function appendToChain(
-  chain: Promise<void>,
-  work: () => Promise<void>,
-): Promise<void> {
+function appendToChain(chain: Promise<void>, work: () => Promise<void>): Promise<void> {
   return chain.then(work).catch((err: unknown) => {
     console.warn('[ananta bridge] skill import failed:', err);
   });

@@ -98,9 +98,7 @@ export function AppShell() {
           role="status"
           className="mx-auto w-full max-w-7xl mt-4 flex items-center justify-between gap-3 rounded-md border border-cyan-800 bg-cyan-950 px-4 py-2 text-sm text-cyan-200"
         >
-          <span>
-            {importedSummary}
-          </span>
+          <span>{importedSummary}</span>
           <button
             type="button"
             onClick={dismiss}
