@@ -158,6 +158,25 @@
     sendProgress();
   });
 
+  // A studio reported a real, checkable success. Only known achievement ids
+  // count, so junk or hostile events are harmless. The existing mission
+  // listener and 'qpath:ready' handshake are untouched, and achievements are
+  // never cleared or reset anywhere.
+  window.addEventListener('ananta:achievement', function (event) {
+    var id = event && event.detail && event.detail.id;
+    if (ACHIEVEMENT_IDS.indexOf(id) === -1) return;
+    try {
+      var counts = achievementCounts();
+      // Cap the stored count to bound storage growth.
+      counts[id] = Math.min((counts[id] || 0) + 1, ACHIEVEMENT_COUNT_MAX);
+      localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(counts));
+    } catch (err) {
+      // Storage may be disabled or full; the learner keeps their progress in
+      // memory for this send and retries naturally on the next event.
+    }
+    sendProgress();
+  });
+
   /*
    * Careers dropdown route handling. The five menu items point at QPath
    * pages inside the #view-careers iframe; QPath's router wants a clean
