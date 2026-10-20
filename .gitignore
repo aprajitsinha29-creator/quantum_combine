@@ -1,0 +1,9 @@
+# Quantum demo stack: never track data, caches or env files.
+data/
+.vite/
+*.db
+*.db-wal
+*.db-shm
+node_modules/
+.venv/
+.env
