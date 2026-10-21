@@ -11,9 +11,6 @@ class VQEChemistryStudio {
     this.theta1 = 0.0;
     this.theta2 = 0.0;
     this.noiseEnabled = false;
-    // Once-per-page-load latch for the chemical-accuracy success report;
-    // updateAll runs on every slider/input event, so it must only fire once.
-    this.chemAccuracyReported = false;
     this.isOptimizing = false;
     this.optimizationHistory = [];
 
@@ -177,14 +174,6 @@ class VQEChemistryStudio {
       const isChemAcc = deltaE <= chemicalAccuracyThreshold;
       this.energyDeltaEl.textContent = `ΔE = ${mHa} mHa ${isChemAcc ? '🎯 (Chemical Accuracy Reached!)' : ''}`;
       this.energyDeltaEl.style.color = isChemAcc ? 'var(--accent-green, #81c995)' : 'var(--accent-amber, #fdd663)';
-
-      // Real learning success reached. Once per page load: noise adds
-      // Math.random() to the energy so isChemAcc can flicker across updates,
-      // and the latch keeps repeated re-calculations from spamming the event.
-      if (isChemAcc && !this.noiseEnabled && !this.chemAccuracyReported) {
-        this.chemAccuracyReported = true;
-        window.dispatchEvent(new CustomEvent('ananta:achievement', { detail: { id: 'vqe_chem_acc' } }));
-      }
     }
 
     this.renderPauliTerms();
