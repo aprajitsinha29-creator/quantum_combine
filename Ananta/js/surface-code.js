@@ -16,6 +16,13 @@ class SurfaceCodeStudio {
     this.animationTimer = null;
     this.autoCycle = false;
 
+    // Provenance flag for the current error set: true only while the active
+    // errors came from injectRandomNoise (a blind random shower), false after
+    // resetAll or a decode that resolves the pattern. The achievement below
+    // requires FALSE: evidence must be an error pattern the learner built by
+    // hand and then decoded, not one a button rolled for them.
+    this.noiseInjected = false;
+
     this.initElements();
     this.buildLattice(this.distance);
     this.attachEvents();
@@ -245,6 +252,7 @@ class SurfaceCodeStudio {
     this.renderLattice();
     this.updateStats();
     this.logSyndromeEvent(`Random thermal noise injected ${injected} Pauli errors (p = ${(this.errorRate * 100).toFixed(1)}%)`);
+    this.noiseInjected = true;
   }
 
   // Minimum-Weight Perfect Matching (MWPM) / Union-Find Visual Decoder
@@ -281,6 +289,21 @@ class SurfaceCodeStudio {
       this.historyStats.correctedCount++;
       this.setStatus(`✅ All syndromes successfully annihilated! Logical state |ψ_L⟩ preserved with 100% fidelity.`, 'success');
       this.logSyndromeEvent(`Decoder successfully matched and corrected ${correctionsApplied} qubits without logical error.`);
+      // Report a real, checkable success ONLY here: reaching this branch means
+      // the decoder matched and applied corrections that annihilated the
+      // syndrome without a logical flip. The 'code space is clean' early
+      // return and the logical-error branch above both skip this — a clean
+      // lattice or a failed decode proves nothing for the careers bridge.
+      // Provenance, not a click counter: the decode must have corrected at
+      // least two qubits AND the error set must have been built by hand
+      // (noiseInjected === false at decode time). Random noise proves the
+      // noise slider, not the learner. No click counter exists to fake.
+      if (correctionsApplied >= 2 && !this.noiseInjected) {
+        window.dispatchEvent(new CustomEvent('ananta:achievement', { detail: { id: 'surface_decode' } }));
+      }
+      // The decode resolved the active error pattern, so its provenance is
+      // exhausted for this round; the next pattern starts from a clean slate.
+      this.noiseInjected = false;
     }
   }
 
@@ -397,6 +420,8 @@ class SurfaceCodeStudio {
     });
     this.ancillas.forEach(a => a.syndrome = 0);
     this.decoderLog = [];
+    // The error set is now empty, so all provenance resets with it.
+    this.noiseInjected = false;
     this.renderLattice();
     this.updateStats();
     this.setStatus('Lattice reset to pure fault-tolerant ground state |0_L⟩', 'info');
