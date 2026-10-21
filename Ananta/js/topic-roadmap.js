@@ -13,6 +13,12 @@ class TopicRoadmapManager {
     this.activeModule = null;
     this.isDockedInSplit = false;
 
+    // Edge-state for the module-passed handoff (see _processModulePassEdge):
+    // per-preset 'armed' flags, kept false until the FIRST render of an
+    // exercise observes a FAILING circuit, and armed presets dispatch the
+    // bridge event exactly once when a later render observes a PASS.
+    this.passedEdgeArmed = {};
+
     // Define Master Curriculum Modules (18 Core Modules with Landmark Research Citations)
     this.modules = [
       {
@@ -163,7 +169,7 @@ class TopicRoadmapManager {
         circuitPreset: 'vqe',
         mathFormula: 'E(θ) = ⟨ψ(θ)|H_molecule|ψ(θ)⟩ ≥ E_ground',
         intuition: 'The quantum processor computes state energy efficiently while a classical optimizer tunes gate parameters iteratively.',
-        exerciseGoal: 'Inspect the VQE ansatz circuit for Hydrogen H2 and run the variational energy evaluation.'
+        exerciseGoal: 'Build an H2-style ansatz: place X on one wire to prepare one electron, then use H and CNOT to create an entangled superposition of |01⟩ and |10⟩.'
       },
       {
         id: 'module-11',
@@ -1569,6 +1575,10 @@ class TopicRoadmapManager {
           [null, null, null, null, null, null]
         ];
       case 'vqe':
+        // Kept as-is by design: this incomplete ending circuit does NOT pass
+        // the checked exercise (it ends in a product state), so the learner
+        // must build the entangled two-electron superposition themselves —
+        // verified below by the strict rule.
         return [
           ['X', 'H', 'CX_CTRL', 'H', null, null],
           [null, 'H', 'CX_TGT', 'S', null, null],
@@ -1581,10 +1591,14 @@ class TopicRoadmapManager {
           [null, null, null, null, 'H', null]
         ];
       case 'surface_code':
+        // Empty by design: the exercise asks the learner to BUILD the 3-qubit
+        // repetition code. The previous preset already WAS the finished,
+        // passing circuit, so the exercise passed the moment the module
+        // opened and proved nothing.
         return [
-          ['H', 'CX_CTRL', 'CX_CTRL', null, null, null],
-          [null, 'CX_TGT', null, null, null, null],
-          [null, null, 'CX_TGT', null, null, null]
+          [null, null, null, null, null, null],
+          [null, null, null, null, null, null],
+          [null, null, null, null, null, null]
         ];
       case 'qaoa':
         return [
@@ -1771,6 +1785,9 @@ class TopicRoadmapManager {
     this.armedGate = null;
     this.cnotPending = null;
     this.swapPending = null;
+    // A preset was just (re)applied: the passing edge must never fire from
+    // preset application or from its initial render. Verify again.
+    this.passedEdgeArmed[this.embeddedPreset] = false;
     this.renderEmbeddedStudio(mod);
   }
 
@@ -1914,6 +1931,7 @@ class TopicRoadmapManager {
         probsList = engine.getProbabilities ? engine.getProbabilities() : [];
         entropyVal = engine.getEntanglementEntropy ? engine.getEntanglementEntropy() : 0;
         exerciseVerification = this.verifyExerciseGoal(this.embeddedPreset, engine, probsList);
+        this._processModulePassEdge(exerciseVerification.passed);
       }
     } catch (simErr) {
       console.warn('Embedded simulator error:', simErr);
@@ -2262,6 +2280,29 @@ class TopicRoadmapManager {
     }
   }
 
+  /**
+   * Edge trigger for the careers bridge (Step 10e). The exercise check runs
+   * on every render, so dispatching needs state: an `armed` flag per preset
+   * key. Arming happens the first time a render sees passed === false
+   * (i.e. the learner has SEEN the objective fail); dispatch happens only
+   * for an armed preset on a later render that sees passed === true, and
+   * then the flag is cleared again. Never dispatches on page load, on render
+   * alone, or on preset application — initEmbeddedStudio resets the flag.
+   * The module id comes from the module data: the module whose circuitPreset
+   * matches the current preset key (never hardcoded).
+   */
+  _processModulePassEdge(passed) {
+    const presetKey = this.embeddedPreset;
+    const edge = modulePassEdge(!!this.passedEdgeArmed[presetKey], passed);
+    this.passedEdgeArmed[presetKey] = edge.armed;
+    if (!edge.dispatch) return;
+    if (typeof window === 'undefined' || typeof CustomEvent === 'undefined') return;
+    const mod = this.modules.find(m => m.circuitPreset === presetKey)
+      || (this.generatedModules || []).find(m => m.circuitPreset === presetKey);
+    if (!mod) return;
+    window.dispatchEvent(new CustomEvent('ananta:module-passed', { detail: { id: mod.id } }));
+  }
+
   // Check circuit state against learning objective
   verifyExerciseGoal(presetKey, engine, probs) {
     const grid = this.embeddedGrid;
@@ -2345,11 +2386,11 @@ class TopicRoadmapManager {
     }
 
     if (presetKey === 'vqe') {
-      const hasEntanglement = grid.some(row => row.includes('CX_CTRL') || row.includes('CX_TGT'));
-      if (hasEntanglement && active.length >= 2) {
+      const entropy = engine && engine.getEntanglementEntropy ? engine.getEntanglementEntropy() : 0;
+      if (checkVqeAnsatzCircuit(grid, probs, entropy)) {
         return { passed: true, text: 'VQE Molecular Ansatz Verified! Variational parameters prepare entangled ground state for H2 Hamiltonian evaluation.' };
       }
-      return { passed: false, text: 'Inspect the VQE ansatz circuit for Hydrogen H2 and run the variational energy evaluation.' };
+      return { passed: false, text: 'Build an H2-style ansatz: place X on one wire to prepare one electron, then use H and CNOT to create an entangled superposition of |01⟩ and |10⟩.' };
     }
 
     if (presetKey === 'qft') {
@@ -2361,11 +2402,11 @@ class TopicRoadmapManager {
     }
 
     if (presetKey === 'surface_code') {
-      const hasCx = grid.some(row => row.includes('CX_CTRL') || row.includes('CX_TGT'));
-      if (hasCx) {
+      const entropy = engine && engine.getEntanglementEntropy ? engine.getEntanglementEntropy() : 0;
+      if (checkSurfaceCodeCircuit(grid, probs, entropy)) {
         return { passed: true, text: 'Repetition Code Verified! Data qubit q[0] entangled with ancilla syndrome check qubits.' };
       }
-      return { passed: false, text: 'Entangle data qubit q[0] with syndrome check qubits q[1] and q[2] using CNOT gates.' };
+      return { passed: false, text: 'Entangle data qubit q[0] with syndrome check qubits q[1] and q[2] using CNOT gates, and encode q[0] with H or X.' };
     }
 
     if (presetKey === 'qaoa') {
@@ -2447,6 +2488,8 @@ class TopicRoadmapManager {
     this.armedGate = null;
     this.cnotPending = null;
     this.swapPending = null;
+    // Module left: a reopen re-applies the preset and resets its edge again.
+    this.passedEdgeArmed = {};
   }
 
   // -------------------------------------------------------------------
@@ -3023,11 +3066,140 @@ class TopicRoadmapManager {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Pure exercise-rule functions. These live OUTSIDE the manager class on
+// purpose: they take only (grid, probs, entropy), touch no DOM and can be
+// unit-tested in Node exactly the way other browser scripts are (vm context).
+// verifyExerciseGoal branches call them and own the pass/fail presentation.
+// ---------------------------------------------------------------------------
+
+/** Normalizes a probability entry's state string ('|000⟩') to '000'. */
+function exerciseStateBits(state) {
+  return String(state).replace(/[|⟩\s]/g, '');
+}
+
+/**
+ * 3-qubit bit-flip repetition-code rule.
+ * Passes ONLY when ALL hold:
+ *  1. q0 controls a CNOT into q1 and a CNOT into q2, each pair in the same
+ *     column (grid[0][c] === 'CX_CTRL' with grid[t][c] === 'CX_TGT').
+ *  2. q0 carries an 'H' or 'X' in its row — the gate that encodes a logical
+ *     |1> as an actual superposition rather than |000>.
+ *  3. The final state is the code space (|000>+|111>) state: P(000)+P(111)
+ *     > 0.99. This is the real test: it rejects wrong wiring and wrong gate
+ *     order because an H placed AFTER the CNOTs (or a reversed control)
+ *     leaks amplitude into other states.
+ *  @param {Array<Array>} grid  3-wire x 6-column gate grid
+ *  @param {Array<{state:string, probability:number}>} probs  engine probabilities
+ *  @param {number} entropy  entanglement entropy (unused here, kept for a
+ *                           uniform rule signature across presets)
+ *  @returns {boolean}
+ */
+function checkSurfaceCodeCircuit(grid, probs, entropy) {
+  if (!grid || !Array.isArray(grid) || grid.length < 3) return false;
+  if (!Array.isArray(probs) || probs.length === 0) return false;
+
+  // Requirement 1: exact control wire, exact target wires, same column.
+  let pairs = 0; // number of required pairs found (need q1 AND q2 targets)
+  for (let col = 0; col < (grid[0] || []).length; col++) {
+    if (grid[0][col] !== 'CX_CTRL') continue;
+    if (grid[1] && grid[1][col] === 'CX_TGT') pairs |= 1;
+    if (grid[2] && grid[2][col] === 'CX_TGT') pairs |= 2;
+  }
+  if (pairs !== 3) return false;
+
+  // Requirement 2: q0 encodes a logical bit (H prepares the superposition of
+  // the code space, X prepares the |111> branch).
+  const q0Row = grid[0] || [];
+  if (!q0Row.includes('H') && !q0Row.includes('X')) return false;
+
+  // Requirement 3: the state check. Strip '|', '⟩' and spaces from p.state
+  // first — the engine emits states like '|000⟩' (qubit 0 is the leftmost bit).
+  let codeSpaceMass = 0;
+  for (const p of probs) {
+    const bits = exerciseStateBits(p && p.state);
+    if (bits === '000' || bits === '111') {
+      codeSpaceMass += p.probability;
+    }
+  }
+  return codeSpaceMass > 0.99;
+}
+
+/**
+ * H2-style VQE ansatz rule (one electron pair in a particle-conserving
+ * superposition). Passes ONLY when ALL hold:
+ *  1. A CNOT pair exists somewhere in the grid (any control/target wires).
+ *  2. At least 2 computational states carry probability > 0.05.
+ *  3. Probability mass on states with EXACTLY ONE '1' bit > 0.99 — the
+ *     particle-number conservation signature. H + CNOT alone produces
+ *     |00>+|11> (two electrons or zero electrons) and fails here, while
+ *     X(q1)+H(q0)+CNOT(0->1) produces |01>+|10> and passes.
+ *  4. The engine's entanglement entropy > 0.5 (default bipartition: qubit 0
+ *     vs the rest of the register), which a product state can never reach.
+ *  @returns {boolean}
+ */
+function checkVqeAnsatzCircuit(grid, probs, entropy) {
+  if (!grid || !Array.isArray(grid)) return false;
+  if (!Array.isArray(probs) || probs.length === 0) return false;
+
+  // Requirement 1: an entangling CNOT pair anywhere in the grid.
+  let hasCnotPair = false;
+  const numCols = (grid[0] || []).length;
+  for (let col = 0; col < numCols; col++) {
+    let hasCtrl = false;
+    let hasTgt = false;
+    for (let q = 0; q < grid.length; q++) {
+      if (grid[q] && grid[q][col] === 'CX_CTRL') hasCtrl = true;
+      if (grid[q] && grid[q][col] === 'CX_TGT') hasTgt = true;
+    }
+    if (hasCtrl && hasTgt) hasCnotPair = true;
+  }
+  if (!hasCnotPair) return false;
+
+  // Requirement 2: a genuine superposition, not a single dressed state.
+  const significant = probs.filter(p => p && p.probability > 0.05);
+  if (significant.length < 2) return false;
+
+  // Requirement 3: exactly-one-electron mass (particle conservation).
+  let oneBitsMass = 0;
+  for (const p of probs) {
+    const bits = exerciseStateBits(p && p.state);
+    if (!/^[01]+$/.test(bits)) continue;
+    const ones = (bits.match(/1/g) || []).length;
+    if (ones === 1) oneBitsMass += p.probability;
+  }
+  if (oneBitsMass <= 0.99) return false;
+
+  // Requirement 4: actual qubit-0 entanglement (bipartition used by the
+  // engine: q0 traced against (q1, q2)).
+  return entropy > 0.5;
+}
+
+/**
+ * Edge trigger for the module-passed event (pure; tested in Node).
+ * The exercise check runs on EVERY render, so dispatching needs one bit of
+ * state: an 'armed' flag. Pass armed=false for the first render
+ * (apply-preset resets it) and the returned .armed value thereafter.
+ *  - passing on the very first render: dispatches nothing, never arms
+ *    (e.g. another preset whose baseline circuit already passes).
+ *  - fail-then-pass: dispatches exactly once, then disarms again.
+ */
+function modulePassEdge(armed, passed) {
+  if (armed && passed) return { dispatch: true, armed: false };
+  if (!armed && !passed) return { dispatch: false, armed: true };
+  return { dispatch: false, armed: armed };
+}
 
 if (typeof window !== 'undefined') {
   window.TopicRoadmapManager = TopicRoadmapManager;
+  window.AnantaExerciseRules = { checkSurfaceCodeCircuit, checkVqeAnsatzCircuit, modulePassEdge };
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { TopicRoadmapManager };
+  module.exports = {
+    TopicRoadmapManager,
+    checkSurfaceCodeCircuit,
+    checkVqeAnsatzCircuit,
+    modulePassEdge,
+  };
 }
