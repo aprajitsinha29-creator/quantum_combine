@@ -8,8 +8,11 @@
  * read-merge-write sequence that adds earned skill ids to the learner's
  * declared skills without losing anything already declared.
  *
- * Honest limit: only two skills (quantum_mechanics, quantum_information) are
- * reachable from Ananta's missions, so this is a real but small handoff.
+ * Honest note: all four QPath skills are reachable from Ananta now — two via
+ * missions (quantum_mechanics, quantum_information) and two via two-part
+ * evidence (the module-10/module-12 roadmap exercises passed AND a real
+ * studio success: vqe_chem_acc, surface_decode). It is a real but small
+ * handoff.
  *
  * No React here — useAnantaBridge owns the event wiring; the backend owns
  * the profile. All HTTP goes through the feature api / apiClient as usual.
