@@ -14,6 +14,15 @@ class VQEChemistryStudio {
     this.isOptimizing = false;
     this.optimizationHistory = [];
 
+    // Evidence bookkeeping for thechemical-accuracy achievement: |E - E_exact|
+    // in Ha as of the LAST recomputation (manual input or optimizer step),
+    // and the once-per-page-load latch. The achievement fires only inside the
+    // theta1 slider's own oninput: an outside(>1.6mHa)-to-inside(<=1.6mHa)
+    // transition produced by the learner's own movement, with noise OFF —
+    // never in the Auto-Optimize path or on a programmatic slider write.
+    this._lastErrorHa = null;
+    this.chemAccuracyReported = false;
+
     // Molecular Database & Hamiltonian parameters
     this.molecules = {
       'H2': {
@@ -123,8 +132,8 @@ class VQEChemistryStudio {
     const mol = this.molecules[this.selectedMolecule];
     const h = mol.hamiltonian(R);
 
-    // Exact state for 2-qubit UCCSD ansatz |psi> = cos(t1)|01> - sin(t1)|10> + phase(t2)
-    // <H> = g0 + g1<Z0> + g2<Z1> + g3<Z0 Z1> + (g4 + g5)<X0 X1 + Y0 Y1>
+    // Exact state for 2-qubit UCCSD ansatz |psi> = cos(t1)|01> - sin(t1)e^{i t2}|10>
+    // <H> = g0 + g1<Z0> + g2<Z1> + g3<Z0 Z1> + g4<X0 X1 + Y0 Y1>
     const cos1 = Math.cos(theta1);
     const sin1 = Math.sin(theta1);
     const cos2 = Math.cos(theta2);
@@ -132,7 +141,13 @@ class VQEChemistryStudio {
     const expZ0 = cos1 * cos1 - sin1 * sin1; // 1 - 2*sin^2(t1)
     const expZ1 = -expZ0;
     const expZ0Z1 = -1.0;
-    const expXX_YY = -2.0 * sin1 * cos1 * cos2;
+    // <psi|X0X1 + Y0Y1|psi> = 4*Re(a01* a10). Both X0X1 and Y0Y1 map |01><->|10
+    // (Y0Y1|01> = (i|1>)(-i|0>) = |10>), so each contributes 2*a01*a10 and the
+    // pair is 4*Re(a01* a10) = -4*sin(t1)cos(t1)cos(t2). An earlier version
+    // used -2*sin*cos*cos(t2) (half the physical value), which halved the
+    // off-diagonal coupling against getExactEnergy's (2*g4) eigenvalue gap and
+    // left a ~7.7 mHa floor: chemical accuracy was unreachable anywhere.
+    const expXX_YY = -4.0 * sin1 * cos1 * cos2;
 
     let energy = h.g0 + (h.g1 * expZ0) + (h.g2 * expZ1) + (h.g3 * expZ0Z1) + (h.g4 * expXX_YY);
 
@@ -159,6 +174,9 @@ class VQEChemistryStudio {
     const exactEnergy = this.getExactEnergy(this.bondDistance);
     const deltaE = Math.abs(currentEnergy - exactEnergy);
     const chemicalAccuracyThreshold = 0.0016; // 1.6 mHa = 1 kcal/mol
+    // Snapshot for the transition check in the theta1 slider handler: it
+    // needs the error BEFORE the learner's next manual input.
+    this._lastErrorHa = deltaE;
 
     if (this.molTitleEl) this.molTitleEl.textContent = mol.name;
     if (this.molQubitBadge) this.molQubitBadge.textContent = `${mol.qubits} Qubits Active Space`;
@@ -328,6 +346,13 @@ class VQEChemistryStudio {
       if (!this.isOptimizing || step >= maxSteps) {
         this.isOptimizing = false;
         if (btn) btn.textContent = 'Auto-Optimize VQE 🚀';
+        // Step 12: the optimizer FINISHES by refreshing the stored error
+        // snapshot. Auto-Optimize followed by a tiny slider nudge then starts
+        // from an in-window 'before' value and can never fire the event.
+        this._lastErrorHa = Math.abs(
+          this.calculateEnergy(this.theta1, this.theta2, this.bondDistance)
+          - this.getExactEnergy(this.bondDistance)
+        );
         return;
       }
 
@@ -385,8 +410,27 @@ class VQEChemistryStudio {
 
     if (this.theta1Slider) {
       this.theta1Slider.oninput = (e) => {
+        // Step 12: the ONLY place the chemical-accuracy achievement is
+        // evaluated. Never in the Auto-Optimize path (its gradient loop sets
+        // this.theta1Slider.value directly, which fires nothing here) and
+        // never on any other programmatic write. Evidence = an
+        // outside-to-inside (>1.6mHa -> <=1.6mHa) transition caused by this
+        // very input, noise OFF, once per page load.
         this.theta1 = parseFloat(e.target.value);
-        this.updateAll();
+        const errorBeforeHa = this._lastErrorHa;
+        this.updateAll(); // refreshes _lastErrorHa for the new theta1
+        if (
+          this.chemAccuracyReported ||
+          this.noiseEnabled ||
+          errorBeforeHa === null ||
+          !Number.isFinite(errorBeforeHa) ||
+          errorBeforeHa <= 0.0016 ||
+          this._lastErrorHa > 0.0016
+        ) {
+          return;
+        }
+        this.chemAccuracyReported = true;
+        window.dispatchEvent(new CustomEvent('ananta:achievement', { detail: { id: 'vqe_chem_acc' } }));
       };
     }
 
