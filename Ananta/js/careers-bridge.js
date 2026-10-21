@@ -7,8 +7,9 @@
  * 'qpath:ready' after mounting and on reloads; this file only READS local
  * progress and SENDS it — it never clears or resets anything.
  *
- * Honest note: four QPath skills are reachable — two via missions and two
- * via achievement events fired by the studio scripts on real successes.
+ * Honest note: four QPath skills are reachable — two via missions and two via
+ * two-part evidence (a passed checked roadmap exercise AND one real success
+ * achievement fired by the matching studio script).
  * No globals are added; everything lives in this IIFE.
  */
 (function () {
@@ -23,41 +24,78 @@
 
   // Achievement counters written by this file only; studio scripts just fire
   // 'ananta:achievement' events when a real, checkable success happens.
-  var ACHIEVEMENTS_KEY = 'ananta_achievements_v1';
+  // v1 held ONE-event evidence under the old weak triggers; every v1 value is
+  // deliberately ignored after that data meant something else.
+  var ACHIEVEMENTS_KEY = 'ananta_achievements_v2';
+
+  // Roadmap modules the learner has fully passed in topic-roadmap.js, written
+  // by this file only when 'ananta:module-passed' arrives for a known id.
+  var MODULE_KEY = 'ananta_roadmap_passed_v1';
 
   // Caps storage growth: a counter can only reach 100, so a runaway event
   // loop cannot bloat localStorage.
   var ACHIEVEMENT_COUNT_MAX = 100;
 
   /*
-   * One declarative rule per QPath skill. A skill is earned once its
-   * evidence count reaches the required amount:
+   * One declarative rule per QPath skill. Two rule forms exist:
    *
-   * Missions (ids are the mission numbers used in algorithms.js):
+   * Mission form: skill is earned once at least requiredMissions of the
+   * listed completed missions (ids are the mission numbers used in
+   * algorithms.js) are done:
    *   1 coin flip, 4 interference, 6 phase  -> quantum_mechanics
    *   2 Bell, 5 GHZ, 7 W, 8 Grover          -> quantum_information
-   * Mission 3 (NOT gate) maps to nothing. Each mission skill needs 2
-   * completed missions so it is earned, not given for a single click.
+   * Mission 3 (NOT gate) maps to nothing.
    *
-   * Achievements (events fired by studio scripts on real successes):
-   *   surface_decode: the surface-code studio's decoder freed the lattice of
-   *     defects WITHOUT a logical error and applied >= 2 corrections —
-   *     proof the learner actually used the decoder, not a clean click.
-   *   vqe_chem_acc: the VQE studio reached chemical accuracy with noise OFF,
-   *     once per page load — proof of a converged optimisation run.
+   * All-of form: skill is earned ONLY when EVERY listed requirement is met
+   * simultaneously — checked roadmap exercise passed AND independent studio
+   * success. Requirement kinds:
+   *   { kind: 'module', id }        module with this id was passed
+   *   { kind: 'achievement', id }   this achievement is stored (count >= 1)
+   * A single studio achievement is no longer enough by itself, so a script
+   * auto-optimize or a preset the learner never touched proves nothing.
+   *   surface_codes        = module-12 passed AND surface_decode achieved
+   *   variational_algorithms = module-10 passed AND vqe_chem_acc achieved
    */
   var SKILL_RULES = [
     { skill: 'quantum_mechanics', missions: [1, 4, 6], requiredMissions: 2 },
     { skill: 'quantum_information', missions: [2, 5, 7, 8], requiredMissions: 2 },
-    { skill: 'surface_codes', achievement: 'surface_decode', requiredAchievements: 2 },
-    { skill: 'variational_algorithms', achievement: 'vqe_chem_acc', requiredAchievements: 1 },
+    {
+      skill: 'surface_codes',
+      allOf: [
+        { kind: 'module', id: 'module-12' },
+        { kind: 'achievement', id: 'surface_decode' },
+      ],
+    },
+    {
+      skill: 'variational_algorithms',
+      allOf: [
+        { kind: 'module', id: 'module-10' },
+        { kind: 'achievement', id: 'vqe_chem_acc' },
+      ],
+    },
   ];
 
   // The achievement ids this bridge understands, derived from the rules so
   // there is a single source of truth (junk events are filtered against it).
-  var ACHIEVEMENT_IDS = SKILL_RULES
-    .filter(function (rule) { return rule.achievement; })
-    .map(function (rule) { return rule.achievement; });
+  var ACHIEVEMENT_IDS = SKILL_RULES.reduce(function (ids, rule) {
+    if (rule.allOf) {
+      rule.allOf.forEach(function (req) {
+        if (req.kind === 'achievement' && ids.indexOf(req.id) === -1) ids.push(req.id);
+      });
+    }
+    return ids;
+  }, []);
+
+  // The module ids this bridge stores as passed, derived from the same rules.
+  // Unknown module-passed events are junk and are ignored entirely.
+  var MODULE_IDS = SKILL_RULES.reduce(function (ids, rule) {
+    if (rule.allOf) {
+      rule.allOf.forEach(function (req) {
+        if (req.kind === 'module' && ids.indexOf(req.id) === -1) ids.push(req.id);
+      });
+    }
+    return ids;
+  }, []);
 
   /**
    * Read the completed mission ids from localStorage.
@@ -80,7 +118,8 @@
    * Read the achievement counters from localStorage.
    * Returns only an object of id -> positive integer; anything else (missing,
    * malformed, non-JSON, wrong types, non-integer or non-positive counts)
-   * becomes an empty object.
+   * becomes an empty object. The v1 key is not read at all: those counts were
+   * accumulated under the weak triggers and must not satisfy the new rules.
    */
   function achievementCounts() {
     try {
@@ -103,13 +142,41 @@
   }
 
   /**
-   * Skill ids whose evidence (completed missions or achievement counts)
-   * has reached the required amount. Pure: same inputs, same outputs.
+   * Read the set of passed module ids (true entries only) from localStorage.
+   * Unknown ids are ignored — the allowlist comes from SKILL_RULES — so a
+   * stale or hostile storage value outside the curriculum is harmless.
+   * Anything malformed (non-JSON, array, wrong types) becomes an empty object
+   * and the read never throws.
    */
-  function earnedSkills(missions, achievements) {
+  function passedModules() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(MODULE_KEY) || '{}');
+      var passed = {};
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        for (var id in raw) {
+          if (MODULE_IDS.indexOf(id) !== -1 && raw[id] === true) {
+            passed[id] = true;
+          }
+        }
+      }
+      return passed;
+    } catch (err) {
+      return {};
+    }
+  }
+
+  /**
+   * Skill ids whose evidence has been earned. Pure: same inputs, same
+   * outputs. Mission rules need the required mission count; all-of rules
+   * need every requirement met (module passed, achievement counted).
+   */
+  function earnedSkills(missions, achievements, modules) {
     return SKILL_RULES.filter(function (rule) {
-      if (rule.achievement) {
-        return (achievements[rule.achievement] || 0) >= rule.requiredAchievements;
+      if (rule.allOf) {
+        return rule.allOf.every(function (req) {
+          if (req.kind === 'module') return !!modules[req.id];
+          return (achievements[req.id] || 0) >= 1;
+        });
       }
       var done = rule.missions.filter(function (id) {
         return missions.indexOf(id) !== -1;
@@ -136,7 +203,7 @@
       {
         type: 'ananta:progress',
         version: 1,
-        skills: earnedSkills(missions, achievementCounts()),
+        skills: earnedSkills(missions, achievementCounts(), passedModules()),
         missions: missions,
       },
       QPATH_ORIGIN,
@@ -173,6 +240,23 @@
     } catch (err) {
       // Storage may be disabled or full; the learner keeps their progress in
       // memory for this send and retries naturally on the next event.
+    }
+    sendProgress();
+  });
+
+  // topic-roadmap.js fired this after a render verified a passing exercise.
+  // Same convention as 'ananta:achievement': only ids that some all-of rule
+  // names are stored, storage is never cleared, and progress is re-sent so
+  // the second half of the skill's evidence updates QPath immediately.
+  window.addEventListener('ananta:module-passed', function (event) {
+    var id = event && event.detail && event.detail.id;
+    if (MODULE_IDS.indexOf(id) === -1) return;
+    try {
+      var passed = passedModules();
+      passed[id] = true;
+      localStorage.setItem(MODULE_KEY, JSON.stringify(passed));
+    } catch (err) {
+      // Storage may be disabled or full; treated the same way everywhere.
     }
     sendProgress();
   });
