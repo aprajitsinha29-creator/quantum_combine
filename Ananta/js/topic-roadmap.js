@@ -2831,12 +2831,7 @@ class TopicRoadmapManager {
         <div class="waterfall-module-list">${cardsHtml}</div>
       </div>
 
-      <div class="curated-bottom-actions">
-        <p>Want to explore all 18 core modules in a single comprehensive syllabus?</p>
-        <button class="btn-view-full-roadmap" type="button" onclick="window.topicRoadmapManager.loadTopicById('full-curriculum')">
-          Browse Full Master Learning Roadmap (All 18 Modules) →
-        </button>
-      </div>
+
     `;
 
     // Trigger staggered node entry animations
