@@ -7,7 +7,7 @@
 // browser's localStorage and never committed.
 (function() {
   window.ANANTA_CONFIG = {
-    GEMINI_API_KEY: (typeof localStorage !== 'undefined' && localStorage.getItem('ananta_gemini_key')) || '',
+    GEMINI_API_KEY: "AQ.Ab8RN6I6btEn-QqzvfYI45YJukffFp9XadOqaYMp375V-M2vVQ",
     OPENAI_API_KEY: '',
     DEFAULT_PROVIDER: 'gemini'
   };

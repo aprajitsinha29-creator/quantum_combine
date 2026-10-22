@@ -27,6 +27,11 @@
   // Written only by careers-bridge.js after validating a 'qpath:gaps' message.
   var STORAGE_KEY = 'ananta_qpath_gaps_v1';
 
+  // Persists the set of skill ids whose bubble has already been shown and
+  // dismissed (by cross or auto-hide). A skill in this set will never trigger
+  // the bubble again, even after a page reload.
+  var DISMISSED_KEY = 'ananta_gap_bubble_dismissed_v1';
+
   // The reply fires after a skill is declared or removed in QPath mid-session.
   var UPDATE_EVENT = 'ananta:gaps-updated';
 
@@ -109,12 +114,48 @@
     });
   });
 
+  /**
+   * Read the persisted set of already-dismissed skill ids from localStorage.
+   * Returns a plain object keyed by skill id (values are `true`). Malformed
+   * or missing storage counts as an empty set and never throws.
+   */
+  function readDismissed() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(DISMISSED_KEY) || 'null');
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+      return raw;
+    } catch (err) {
+      return {};
+    }
+  }
+
+  /**
+   * Mark a skill id as dismissed so it will never re-show the bubble after a
+   * page reload. Storage errors are swallowed: if writing fails the dismissed
+   * state is still correct for the current page session (knownSkillIds covers
+   * that), so no bubble will pop again during this tab's lifetime.
+   */
+  function markDismissed(id) {
+    try {
+      var dismissed = readDismissed();
+      dismissed[id] = true;
+      localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissed));
+    } catch (err) {
+      /* storage may be disabled or full; best-effort only */
+    }
+  }
+
   // The gap list seen at the previous update; the first id that is NOT in it
-  // is "a newly transferred skill" and triggers the bubble.
-  var knownSkillIds = [];
+  // AND has not been dismissed is "a newly transferred skill" and triggers
+  // the bubble. Pre-seeded from localStorage so existing gaps are never
+  // treated as new on a page reload.
+  var knownSkillIds = readGaps();
 
   /** Id of the timer hiding the bubble; null when no timer is pending. */
   var hideTimerId = null;
+
+  /** The skill id currently shown in the bubble (null when hidden). */
+  var currentSkillId = null;
 
   /**
    * Read the validated gaps storage written by careers-bridge.js. Anything
@@ -186,17 +227,25 @@
     }
     var bubble = ensureBubble();
     if (bubble) bubble.style.display = 'none';
+    // Persist the dismissal so the bubble won't re-appear after a reload.
+    if (currentSkillId !== null) {
+      markDismissed(currentSkillId);
+      currentSkillId = null;
+    }
   }
 
   /**
    * Rebuild the bubble contents for one recommendation and show it for
    * AUTO_HIDE_MS. `topic` is the display name of the recommended topic,
    * `module` the { tab, tabLabel } of the studio that practises it, or null
-   * when no module exists (topic shown without a button).
+   * when no module exists (topic shown without a button). `skillId` is stored
+   * so that hide() can persist the dismissal.
    */
-  function show(topic, module) {
+  function show(topic, module, skillId) {
     var bubble = ensureBubble();
     if (!bubble) return;
+
+    currentSkillId = skillId || null;
 
     while (bubble.firstChild) bubble.removeChild(bubble.firstChild);
 
@@ -260,16 +309,18 @@
 
   /**
    * One bubble per update: the FIRST gap skill that was not in the previous
-   * gap list is the freshly transferred recommendation. It is shown with
-   * its module whenever the skill maps to a studio, and topic-only when it
-   * does not. With nothing new (repeat list, empty list), the bubble is not
-   * touched at all — a cross-dismissed bubble stays dismissed.
+   * gap list AND has not been dismissed before is the freshly transferred
+   * recommendation. It is shown with its module whenever the skill maps to a
+   * studio, and topic-only when it does not. With nothing new (repeat list,
+   * empty list, or all-dismissed), the bubble is not touched at all — a
+   * cross-dismissed bubble stays dismissed across reloads.
    */
   function handleUpdate() {
     var ids = readGaps();
+    var dismissed = readDismissed();
     var freshId = null;
     for (var i = 0; i < ids.length; i++) {
-      if (knownSkillIds.indexOf(ids[i]) === -1) {
+      if (knownSkillIds.indexOf(ids[i]) === -1 && !dismissed[ids[i]]) {
         freshId = ids[i];
         break;
       }
@@ -278,7 +329,7 @@
     if (freshId === null) return;
 
     var entry = SKILLS_BY_ID[freshId];
-    show(entry ? entry.name : freshId, entry ? entry.group : null);
+    show(entry ? entry.name : freshId, entry ? entry.group : null, freshId);
   }
 
   window.addEventListener(UPDATE_EVENT, handleUpdate);

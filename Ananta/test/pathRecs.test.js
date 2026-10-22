@@ -156,7 +156,10 @@ const LINK_CLASS = 'gap-bubble-link';
 const CLOSE_CLASS = 'gap-bubble-close';
 
 test('a newly transferred mapped skill pops with topic, module and a button', () => {
-  const harness = loadPathRecs({ gaps: { skills: ['microwave_rf', 'surface_codes'], at: 1 } });
+  // Start with no gaps so the IIFE initialises knownSkillIds to [].
+  // Then inject a new gap and dispatch — the bubble should pop for the first skill.
+  const harness = loadPathRecs();
+  harness.storage.setItem(GAPS_KEY, JSON.stringify({ skills: ['microwave_rf', 'surface_codes'], at: 1 }));
   harness.dispatchUpdate();
 
   const bubble = harness.bubble();
@@ -178,7 +181,8 @@ test('a newly transferred mapped skill pops with topic, module and a button', ()
 test('a topic without a module shows only the topic name, without any button', () => {
   // 'python' has no Ananta studio; even though a mapped skill follows it, the
   // first fresh (most in-demand) topic decides whether the button exists.
-  const harness = loadPathRecs({ gaps: { skills: ['python', 'qiskit'], at: 2 } });
+  const harness = loadPathRecs();
+  harness.storage.setItem(GAPS_KEY, JSON.stringify({ skills: ['python', 'qiskit'], at: 2 }));
   harness.dispatchUpdate();
 
   assert.equal(harness.byClass(TOPIC_CLASS)[0].textContent, 'Next topic: python');
@@ -214,7 +218,9 @@ test('no new skill means no bubble: malformed, hostile or empty storage is silen
 });
 
 test('a repeat list does not re-pop; a genuinely new skill does', () => {
-  const harness = loadPathRecs({ gaps: { skills: ['surface_codes'], at: 3 } });
+  // Start empty so the IIFE's knownSkillIds is []. First update brings surface_codes.
+  const harness = loadPathRecs();
+  harness.storage.setItem(GAPS_KEY, JSON.stringify({ skills: ['surface_codes'], at: 3 }));
   harness.dispatchUpdate();
   assert.equal(harness.bubble().style.display, 'block');
 
@@ -231,7 +237,8 @@ test('a repeat list does not re-pop; a genuinely new skill does', () => {
 });
 
 test('the cross removes the bubble immediately', () => {
-  const harness = loadPathRecs({ gaps: { skills: ['variational_algorithms'], at: 5 } });
+  const harness = loadPathRecs();
+  harness.storage.setItem(GAPS_KEY, JSON.stringify({ skills: ['variational_algorithms'], at: 5 }));
   harness.dispatchUpdate();
 
   const cross = harness.byClass(CLOSE_CLASS)[0];
@@ -245,7 +252,8 @@ test('the cross removes the bubble immediately', () => {
 });
 
 test('the bubble disappears automatically after one minute', () => {
-  const harness = loadPathRecs({ gaps: { skills: ['stabilizer_formalism'], at: 6 } });
+  const harness = loadPathRecs();
+  harness.storage.setItem(GAPS_KEY, JSON.stringify({ skills: ['stabilizer_formalism'], at: 6 }));
   harness.dispatchUpdate();
   assert.equal(harness.bubble().style.display, 'block');
 
@@ -255,7 +263,8 @@ test('the bubble disappears automatically after one minute', () => {
 });
 
 test('a fresh update restarts the one-minute window', () => {
-  const harness = loadPathRecs({ gaps: { skills: ['qiskit'], at: 7 } });
+  const harness = loadPathRecs();
+  harness.storage.setItem(GAPS_KEY, JSON.stringify({ skills: ['qiskit'], at: 7 }));
   harness.dispatchUpdate();
 
   // Later skill arrives before the minute is up: the old timer is cleared so
@@ -273,7 +282,8 @@ test('a fresh update restarts the one-minute window', () => {
 
 test('hostile or unknown ids are never markup, and labels come from the mapping', () => {
   const hostile = '<img src=x onerror=alert(1)>';
-  const harness = loadPathRecs({ gaps: { skills: [hostile], at: 9 } });
+  const harness = loadPathRecs();
+  harness.storage.setItem(GAPS_KEY, JSON.stringify({ skills: [hostile], at: 9 }));
   harness.dispatchUpdate();
 
   // The fake elements expose no innerHTML at all: the script can only have
@@ -297,3 +307,4 @@ test('hostile or unknown ids are never markup, and labels come from the mapping'
   assert.equal(harness.byClass(MODULE_CLASS).length, 0);
   assert.equal(harness.byClass(LINK_CLASS).length, 0);
 });
+
