@@ -32,6 +32,16 @@
   // by this file only when 'ananta:module-passed' arrives for a known id.
   var MODULE_KEY = 'ananta_roadmap_passed_v1';
 
+  // Reverse flow: the skill ids QPath says the tracked career path asks for
+  // but the learner has not declared (most in-demand first). path-recs.js
+  // renders the "Recommended for your path" strip from this key.
+  var GAPS_KEY = 'ananta_qpath_gaps_v1';
+
+  // Caps for the reverse flow payload: at most 20 ids, each a short string,
+  // so a hostile message cannot bloat storage or the strip.
+  var GAPS_MAX_SKILLS = 20;
+  var GAPS_MAX_SKILL_LENGTH = 64;
+
   // Caps storage growth: a counter can only reach 100, so a runaway event
   // loop cannot bloat localStorage.
   var ACHIEVEMENT_COUNT_MAX = 100;
@@ -185,6 +195,44 @@
     }).map(function (rule) { return rule.skill; });
   }
 
+  /**
+   * Validate a 'qpath:gaps' payload: an array of at most 20 strings, each at
+   * most 64 characters, non-string entries dropped. An empty array is VALID
+   * (it means "no gaps or no tracked path" and clears the strip). Returns
+   * null when the payload itself is unusable; null means "ignore silently".
+   */
+  function parseGaps(data) {
+    var skills = data && data.skills;
+    if (!Array.isArray(skills)) return null;
+    var clean = [];
+    for (var i = 0; i < skills.length; i++) {
+      if (typeof skills[i] === 'string' && skills[i].length <= GAPS_MAX_SKILL_LENGTH) {
+        clean.push(skills[i]);
+      }
+      if (clean.length > GAPS_MAX_SKILLS) break;
+    }
+    if (clean.length > GAPS_MAX_SKILLS) clean = clean.slice(0, GAPS_MAX_SKILLS);
+    return clean;
+  }
+
+  /**
+   * Store the validated gap list and notify path-recs.js. Storage errors are
+   * swallowed (same convention as the achievements above): the strip can
+   * still update from other sends, and no payload is ever trusted further.
+   */
+  function handleGapsMessage(data) {
+    var skills = parseGaps(data);
+    if (!skills) return;
+    try {
+      localStorage.setItem(GAPS_KEY, JSON.stringify({ skills: skills, at: Date.now() }));
+    } catch (err) {
+      // Storage may be disabled or full; nothing downstream can read a write
+      // that failed, so skip the redraw and wait for the next message.
+      return;
+    }
+    window.dispatchEvent(new window.Event('ananta:gaps-updated'));
+  }
+
   /** The Careers iframe (its contentWindow is the QPath child window). */
   function careersFrame() {
     return document.querySelector('#view-careers iframe');
@@ -212,11 +260,21 @@
 
   // Inbound: QPath says it can receive progress. Only accept messages from
   // the exact iframe window on the exact QPath origin; ignore everything else.
+  // The origin and source checks below are THE shared gate for both inbound
+  // message types: 'qpath:ready' (handshake) and 'qpath:gaps' (reverse flow)
+  // reuse them rather than duplicating any check.
   window.addEventListener('message', function (event) {
     if (event.origin !== QPATH_ORIGIN) return;
     var frame = careersFrame();
     if (!frame || event.source !== frame.contentWindow) return;
-    if (!event.data || event.data.type !== 'qpath:ready') return;
+    if (!event.data) return;
+    if (event.data.type === 'qpath:gaps') {
+      // Version 1 only; unknown versions (future or hostile) are ignored so
+      // the stored shape never changes underneath path-recs.js.
+      if (event.data.version === 1) handleGapsMessage(event.data);
+      return;
+    }
+    if (event.data.type !== 'qpath:ready') return;
     sendProgress();
   });
 

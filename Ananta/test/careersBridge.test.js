@@ -17,7 +17,7 @@ const QPATH_ORIGIN = 'http://localhost:5173';
 
 function makeFakeWindow() {
   const listeners = new Map();
-  return {
+  const fake = {
     window: null,
     addEventListener(type, fn) {
       if (!listeners.has(type)) listeners.set(type, []);
@@ -29,6 +29,11 @@ function makeFakeWindow() {
       return fns.length > 0;
     },
   };
+  // The bridge builds the 'ananta:gaps-updated' notification as a real Event.
+  fake.Event = function (type) {
+    this.type = type;
+  };
+  return fake;
 }
 
 function makeFakeLocalStorage() {
@@ -90,6 +95,8 @@ function loadBridge({
     localStorage: storage,
     document,
     JSON, Math, Number, Object, Array,
+    // The bridge timestamps gap storage with Date.now() and builds an Event.
+    Date,
   };
   vm.createContext(sandbox);
   const source = fs.readFileSync(
@@ -110,6 +117,16 @@ function loadBridge({
         type: 'message',
         origin,
         data: { type: 'qpath:ready' },
+        source: source === null ? childWindow : source,
+      });
+    },
+   
+    // Simulate an inbound 'qpath:gaps' reverse-flow message the same way.
+    deliverGaps(data, { origin = QPATH_ORIGIN, source = null } = {}) {
+      fakeWindow.dispatchEvent({
+        type: 'message',
+        origin,
+        data,
         source: source === null ? childWindow : source,
       });
     },
@@ -325,4 +342,131 @@ test('qpath:ready from the real iframe triggers a progress post', () => {
   harness.deliverReady();
   assert.equal(harness.posts.length, 1);
   assert.deepEqual(hostCopy(harness.posts[0].payload.skills), ['quantum_mechanics']);
+});
+
+// ---------------------------------------------------------------
+// Reverse flow: 'qpath:gaps' is received, validated and stored.
+// ---------------------------------------------------------------
+
+const GAPS_KEY = 'ananta_qpath_gaps_v1';
+
+/** Collect 'ananta:gaps-updated' notifications from the harness. */
+function trackGapsEvents(harness) {
+  const events = [];
+  harness.window.addEventListener('ananta:gaps-updated', () => events.push(1));
+  return events;
+}
+
+test('valid qpath:gaps message is stored and the update event fires', () => {
+  const harness = loadBridge();
+  const events = trackGapsEvents(harness);
+  harness.deliverGaps({ type: 'qpath:gaps', version: 1, skills: ['surface_codes', 'qiskit'] });
+  const stored = JSON.parse(harness.storage.getItem(GAPS_KEY));
+  assert.deepEqual(stored.skills, ['surface_codes', 'qiskit']);
+  assert.equal(typeof stored.at, 'number');
+  assert.equal(events.length, 1);
+});
+
+test('an empty skills array is VALID and is stored (it clears the strip)', () => {
+  const harness = loadBridge();
+  const events = trackGapsEvents(harness);
+  harness.deliverGaps({ type: 'qpath:gaps', version: 1, skills: [] });
+  const stored = JSON.parse(harness.storage.getItem(GAPS_KEY));
+  assert.deepEqual(stored.skills, []);
+  assert.equal(events.length, 1);
+});
+
+test('qpath:gaps from a wrong origin is ignored silently', () => {
+  const harness = loadBridge();
+  const events = trackGapsEvents(harness);
+  harness.deliverGaps(
+    { type: 'qpath:gaps', version: 1, skills: ['surface_codes'] },
+    { origin: 'http://evil.example.com' },
+  );
+  assert.equal(harness.storage.getItem(GAPS_KEY), null);
+  assert.equal(events.length, 0);
+});
+
+test('qpath:gaps from a wrong source window is ignored silently', () => {
+  const harness = loadBridge();
+  const events = trackGapsEvents(harness);
+  harness.deliverGaps(
+    { type: 'qpath:gaps', version: 1, skills: ['surface_codes'] },
+    { source: 'stranger' },
+  );
+  assert.equal(harness.storage.getItem(GAPS_KEY), null);
+  assert.equal(events.length, 0);
+});
+
+test('wrong type or missing/version-mismatched gaps messages are ignored', async () => {
+  for (const data of [
+    { type: 'qpath:progress', version: 1, skills: ['surface_codes'] },
+    { type: 'qpath:gaps', version: 2, skills: ['surface_codes'] },
+    { type: 'qpath:gaps', skills: ['surface_codes'] },
+  ]) {
+    const harness = loadBridge();
+    harness.deliverGaps(data);
+    assert.equal(harness.storage.getItem(GAPS_KEY), null, JSON.stringify(data));
+  }
+});
+
+test('a non-array skills field is ignored silently', () => {
+  for (const skills of [
+    'surface_codes',
+    42,
+    null,
+    { 0: 'surface_codes' },
+  ]) {
+    const harness = loadBridge();
+    const events = trackGapsEvents(harness);
+    harness.deliverGaps({ type: 'qpath:gaps', version: 1, skills });
+    assert.equal(harness.storage.getItem(GAPS_KEY), null, JSON.stringify(skills));
+    assert.equal(events.length, 0);
+  }
+});
+
+test('more than 20 entries are capped to the first 20 (most in-demand first)', () => {
+  const harness = loadBridge();
+  const skills = [];
+  for (let i = 0; i < 30; i++) skills.push('s_' + i);
+  const events = trackGapsEvents(harness);
+  harness.deliverGaps({ type: 'qpath:gaps', version: 1, skills });
+  const stored = JSON.parse(harness.storage.getItem(GAPS_KEY));
+  assert.equal(stored.skills.length, 20);
+  assert.deepEqual(stored.skills, skills.slice(0, 20));
+  assert.equal(events.length, 1);
+});
+
+test('entries longer than 64 characters are dropped, short ones kept', () => {
+  const harness = loadBridge();
+  const long = 'x'.repeat(65);
+  const exact = 'y'.repeat(64);
+  harness.deliverGaps({ type: 'qpath:gaps', version: 1, skills: [long, 'surface_codes', exact] });
+  const stored = JSON.parse(harness.storage.getItem(GAPS_KEY));
+  assert.deepEqual(stored.skills, ['surface_codes', exact]);
+});
+
+test('non-string entries are dropped, strings kept', () => {
+  const harness = loadBridge();
+  const events = trackGapsEvents(harness);
+  harness.deliverGaps({
+    type: 'qpath:gaps',
+    version: 1,
+    skills: ['surface_codes', 42, null, { bad: true }, 'qiskit'],
+  });
+  const stored = JSON.parse(harness.storage.getItem(GAPS_KEY));
+  assert.deepEqual(stored.skills, ['surface_codes', 'qiskit']);
+  assert.equal(events.length, 1);
+});
+
+test('existing bridge behaviour is untouched by the gaps branch', () => {
+  const harness = loadBridge({ missions: [1, 4] });
+  harness.deliverGaps({ type: 'qpath:gaps', version: 1, skills: ['cirq'] });
+  harness.deliverReady();
+  // Still exactly one OUTBOUND progress post; the gaps message never posts out.
+  assert.equal(harness.posts.length, 1);
+  for (const post of harness.posts) {
+    assert.equal(post.targetOrigin, 'http://localhost:5173');
+    assert.notEqual(post.targetOrigin, '*');
+  }
 });
