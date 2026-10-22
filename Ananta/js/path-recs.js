@@ -1,20 +1,25 @@
 /*
- * path-recs.js — QPath → Ananta reverse flow (recommendation strip on Overview).
+ * path-recs.js — QPath → Ananta reverse flow (gap-suggestion bubble).
  *
  * careers-bridge.js stores the skill gaps QPath sends ({skills, at} under the
- * 'ananta_qpath_gaps_v1' localStorage key). This file turns those gap ids into
- * a small "Recommended for your path" strip at the top of the Overview tab,
- * linking to the Ananta studios where the learner can PRACTISE those skills.
+ * 'ananta_qpath_gaps_v1' localStorage key). This file turns the FIRST NEW gap
+ * skill in each update into a small fixed-position bubble in the upper right
+ * corner of the page — on WHICHEVER view the user is on, since the bubble is
+ * created on <body>, not inside any view section. The bubble names the topic
+ * the learner should study next and, when a studio module for it exists, the
+ * module and a button that navigates to it. If no module exists for the
+ * recommended topic, only the topic name is shown, without the button.
  *
- * It is a RECOMMENDATION only: a listed skill is "a skill the tracked career
- * path asks for that you have not yet declared in QPath" — never proof that
- * the learner has any skill or has done anything in a studio.
+ * The bubble has a cross that removes it and otherwise hides itself after
+ * 1 minute. It is a RECOMMENDATION only: the named skill is "a skill the
+ * tracked career path asks for that you have not yet declared in QPath" —
+ * never proof that the learner has any skill or has done anything in a studio.
  *
  * Storage and message payloads are treated as untrusted: everything is type
- * checked and capped, and message-derived strings are only ever placed via
- * createElement + textContent (never innerHTML). The only element attributes
- * built here come from the hardcoded mapping table below, never from storage.
- * No globals are added; everything lives in this IIFE.
+ * checked and capped (by careers-bridge.js), and message-derived strings are
+ * only ever placed via createElement + textContent (never innerHTML). All
+ * hrefs and labels come from the hardcoded mapping table below, never from
+ * storage. No globals are added; everything lives in this IIFE.
  */
 (function () {
   'use strict';
@@ -25,13 +30,12 @@
   // The reply fires after a skill is declared or removed in QPath mid-session.
   var UPDATE_EVENT = 'ananta:gaps-updated';
 
-  // At most four studio links keep the strip a strip, not a wall of text.
-  var MAX_RECOMMENDATIONS = 4;
+  /** One minute of visibility, then the bubble hides itself. */
+  var AUTO_HIDE_MS = 60000;
 
   /**
    * THE mapping: QPath skill ids (from Qpath/backend/app/data/skills_vocab.json)
-   * → the Ananta tab that genuinely lets a learner practise them. Each group
-   * carries a short, verified summary of what the studio really offers:
+   * → the Ananta tab (module) that genuinely lets a learner practise them:
    *
    * surface-code   rotated planar code builder, X/Z stabilizer visualizer and a
    *                live MWPM decoder the learner runs on their own circuits.
@@ -40,13 +44,14 @@
    * vqe-chemistry  VQE ansatz on Pauli (Jordan-Wigner) terms with a manual
    *                ground-state energy search.
    * transpiler     6-way cross-framework transpiler (Qiskit, Cirq, PennyLane,
-   *                OpenQASM 3.0, Braket, PyQuil) with parser + code generation.
+   *                OpenQASM 3.0, Braket, PyQuil) + AI doctor.
    * topic-roadmap  checked, graded curriculum exercises spanning linear algebra,
    *                quantum mechanics and quantum information (Bell/BJP modules).
    *
    * Skills NOT listed here (python, hpc, hardware, PQC, optimization, ...) have
-   * no Ananta studio that genuinely practises them and are simply never
-   * recommended. Do not add rows without verifying the practice exists.
+   * no Ananta studio that genuinely practises them: their bubble shows only
+   * the topic name, without a module or button. Do not add rows without
+   * verifying the practice exists.
    */
   var SKILL_MAP = [
     {
@@ -104,41 +109,19 @@
     });
   });
 
-  /**
-   * Pure: turn raw gap skill ids into strip entries. Ids not in the mapping are
-   * dropped, duplicates removed, and the remaining skills grouped one entry per
-   * destination tab. Entries keep the order in which any of their skills first
-   * appeared (most in-demand first, per the 'qpath:gaps' contract) and the list
-   * is capped at 4 entries. Empty/malformed input returns [].
-   */
-  function recommendationsFor(skillIds) {
-    if (!Array.isArray(skillIds)) return [];
-    var seenSkills = {};
-    var clusters = [];
-    var byTab = {};
-    for (var i = 0; i < skillIds.length; i++) {
-      var id = skillIds[i];
-      if (typeof id !== 'string' || seenSkills[id]) continue;
-      seenSkills[id] = true;
-      var entry = SKILLS_BY_ID[id];
-      if (!entry) continue;
-      if (!byTab[entry.group.tab]) {
-        byTab[entry.group.tab] = {
-          tab: entry.group.tab,
-          tabLabel: entry.group.tabLabel,
-          skills: [],
-        };
-        clusters.push(byTab[entry.group.tab]);
-      }
-      byTab[entry.group.tab].skills.push(entry.name);
-    }
-    return clusters.slice(0, MAX_RECOMMENDATIONS);
-  }
+  // The gap list seen at the previous update; the first id that is NOT in it
+  // is "a newly transferred skill" and triggers the bubble.
+  var knownSkillIds = [];
+
+  /** Id of the timer hiding the bubble; null when no timer is pending. */
+  var hideTimerId = null;
 
   /**
    * Read the validated gaps storage written by careers-bridge.js. Anything
    * malformed (missing, non-JSON, wrong types) counts as empty and never
    * throws; skill ids are filtered to strings so late defence stays local.
+   * An empty list (no gaps or no tracked path) clears nothing — it simply
+   * never matches a fresh skill, so no bubble pops.
    */
   function readGaps() {
     try {
@@ -153,54 +136,150 @@
     }
   }
 
-  /** Build one studio link; label and coverage come from the mapping only. */
-  function buildLink(rec) {
-    var link = document.createElement('a');
-    link.href = '#' + rec.tab;
-    link.textContent = rec.tabLabel + ' — ' + rec.skills.join(', ');
-    return link;
+  /** Build one node with a class and inline styles; text set by the caller. */
+  function node(tag, className, styles) {
+    var el = document.createElement(tag);
+    if (className) el.className = className;
+    for (var key in (styles || {})) el.style[key] = styles[key];
+    return el;
+  }
+
+  var BUBBLE_STYLES = {
+    position: 'fixed',
+    top: '68px', // below the 56px navigation bar
+    right: '16px',
+    zIndex: '10000',
+    maxWidth: '300px',
+    padding: '14px 16px',
+    background: 'rgba(13, 15, 26, 0.95)',
+    color: '#f2f3f7',
+    border: '1px solid rgba(255, 255, 255, 0.18)',
+    borderRadius: '12px',
+    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.45)',
+    fontSize: '13px',
+    lineHeight: '1.45',
+    fontFamily: 'system-ui, sans-serif',
+  };
+
+  /**
+   * Create (or reuse) the bubble container on <body>, fixed in the upper
+   * right corner so it shows on whichever view the user is on. Returns null
+   * when <body> is not available yet (the caller then does nothing).
+   */
+  function ensureBubble() {
+    if (!document.body || !document.body.appendChild) return null;
+    var bubble = document.querySelector('[data-gap-bubble]');
+    if (!bubble) {
+      bubble = node('div', 'gap-bubble', BUBBLE_STYLES);
+      bubble.setAttribute('data-gap-bubble', '');
+      bubble.style.display = 'none';
+      document.body.appendChild(bubble);
+    }
+    return bubble;
+  }
+
+  /** Hide the bubble (cross click or the one-minute timer). */
+  function hide() {
+    if (hideTimerId !== null) {
+      clearTimeout(hideTimerId);
+      hideTimerId = null;
+    }
+    var bubble = ensureBubble();
+    if (bubble) bubble.style.display = 'none';
   }
 
   /**
-   * Render the strip inside #path-recs. Unsafe characters can only end up in
-   * text nodes (textContent), never in markup, and the `hidden` attribute plus
-   * an explicit display toggle keep the element gone when there is nothing to
-   * show (an empty list means "no gaps or no tracked path").
+   * Rebuild the bubble contents for one recommendation and show it for
+   * AUTO_HIDE_MS. `topic` is the display name of the recommended topic,
+   * `module` the { tab, tabLabel } of the studio that practises it, or null
+   * when no module exists (topic shown without a button).
    */
-  function render() {
-    var container = document.querySelector('#path-recs');
-    if (!container) return;
-    var recs = recommendationsFor(readGaps());
+  function show(topic, module) {
+    var bubble = ensureBubble();
+    if (!bubble) return;
 
-    while (container.firstChild) container.removeChild(container.firstChild);
+    while (bubble.firstChild) bubble.removeChild(bubble.firstChild);
 
-    var heading = document.createElement('h3');
-    heading.textContent = 'Recommended for your path';
-    container.appendChild(heading);
-
-    var intro = document.createElement('p');
-    intro.textContent =
-      'Based on the career path you are tracking in Careers. These studios let you practise skills it asks for.';
-    container.appendChild(intro);
-
-    recs.forEach(function (rec) {
-      container.appendChild(buildLink(rec));
+    // The cross: removes the bubble immediately.
+    var cross = node('button', 'gap-bubble-close', {
+      position: 'absolute',
+      top: '6px',
+      right: '8px',
+      background: 'transparent',
+      color: '#9aa0b4',
+      border: '0',
+      fontSize: '16px',
+      lineHeight: '1',
+      cursor: 'pointer',
+      padding: '4px',
     });
+    cross.setAttribute('aria-label', 'Dismiss');
+    cross.textContent = '×';
+    cross.onclick = hide;
+    bubble.appendChild(cross);
 
-    container.hidden = recs.length === 0;
-    container.style.display = recs.length === 0 ? 'none' : 'block';
-  }
+    var title = node('div', 'gap-bubble-title', {
+      fontWeight: '600',
+      marginBottom: '6px',
+      paddingRight: '18px',
+    });
+    title.textContent = 'Recommended for your path';
+    bubble.appendChild(title);
 
-  // The script tag sits at the end of <body> after the #path-recs div, but the
-  // full page may still be parsing, so wait for DOMContentLoaded when needed.
-  function onReady(fn) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', fn);
-    } else {
-      fn();
+    var topicLine = node('div', 'gap-bubble-topic', { marginBottom: module ? '6px' : '0' });
+    topicLine.textContent = 'Next topic: ' + topic;
+    bubble.appendChild(topicLine);
+
+    if (module) {
+      var moduleLine = node('div', 'gap-bubble-module', { marginBottom: '10px' });
+      moduleLine.textContent = 'Module: ' + module.tabLabel;
+      bubble.appendChild(moduleLine);
+
+      // The "button": an anchor to the studio tab it practises this topic in.
+      var link = node('a', 'gap-bubble-link', {
+        display: 'inline-block',
+        padding: '6px 12px',
+        background: '#2f6bff',
+        color: '#ffffff',
+        borderRadius: '8px',
+        textDecoration: 'none',
+        fontWeight: '600',
+        cursor: 'pointer',
+      });
+      link.href = '#' + module.tab;
+      link.textContent = 'Open ' + module.tabLabel;
+      bubble.appendChild(link);
     }
+
+    bubble.style.display = 'block';
+
+    // Rebroadcasts reset the one-minute window.
+    if (hideTimerId !== null) clearTimeout(hideTimerId);
+    hideTimerId = setTimeout(hide, AUTO_HIDE_MS);
   }
 
-  onReady(render);
-  window.addEventListener(UPDATE_EVENT, render);
+  /**
+   * One bubble per update: the FIRST gap skill that was not in the previous
+   * gap list is the freshly transferred recommendation. It is shown with
+   * its module whenever the skill maps to a studio, and topic-only when it
+   * does not. With nothing new (repeat list, empty list), the bubble is not
+   * touched at all — a cross-dismissed bubble stays dismissed.
+   */
+  function handleUpdate() {
+    var ids = readGaps();
+    var freshId = null;
+    for (var i = 0; i < ids.length; i++) {
+      if (knownSkillIds.indexOf(ids[i]) === -1) {
+        freshId = ids[i];
+        break;
+      }
+    }
+    knownSkillIds = ids.slice();
+    if (freshId === null) return;
+
+    var entry = SKILLS_BY_ID[freshId];
+    show(entry ? entry.name : freshId, entry ? entry.group : null);
+  }
+
+  window.addEventListener(UPDATE_EVENT, handleUpdate);
 })();

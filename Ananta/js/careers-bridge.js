@@ -32,9 +32,8 @@
   // by this file only when 'ananta:module-passed' arrives for a known id.
   var MODULE_KEY = 'ananta_roadmap_passed_v1';
 
-  // Reverse flow: the skill ids QPath says the tracked career path asks for
-  // but the learner has not declared (most in-demand first). path-recs.js
-  // renders the "Recommended for your path" strip from this key.
+  // Reverse flow: the skill ids QPath says the tracked career path asks for      // but the learner has not declared (most in-demand first). path-recs.js
+      // shows the freshly transferred ones as a gap-suggestion bubble.
   var GAPS_KEY = 'ananta_qpath_gaps_v1';
 
   // Caps for the reverse flow payload: at most 20 ids, each a short string,
@@ -217,7 +216,7 @@
 
   /**
    * Store the validated gap list and notify path-recs.js. Storage errors are
-   * swallowed (same convention as the achievements above): the strip can
+   * swallowed (same convention as the achievements above): the bubble can
    * still update from other sends, and no payload is ever trusted further.
    */
   function handleGapsMessage(data) {
