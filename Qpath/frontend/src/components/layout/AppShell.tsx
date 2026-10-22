@@ -8,6 +8,7 @@ import { HealthBadge } from '../../features/health/components/HealthBadge';
 import { useChosenPath } from '../../features/tracker/hooks/useTracker';
 import { getOrCreateProfileId } from '../../lib/profileId';
 import { useAnantaBridge } from '../../features/ananta/useAnantaBridge';
+import { useGapBroadcast } from '../../features/ananta/useGapBroadcast';
 import { isEmbedded } from '../../lib/embed';
 
 export function AppShell() {
@@ -23,6 +24,10 @@ export function AppShell() {
 
   // Tier 2 handoff: skills imported from Ananta missions (no-op standalone).
   const { imported, dismiss } = useAnantaBridge();
+
+  // Reverse flow: broadcast tracked-path skill gaps to the Ananta parent so
+  // its Overview tab can recommend studios (no-op standalone).
+  useGapBroadcast();
   const importedSummary =
     imported.length === 1
       ? `Imported 1 skill from Ananta: ${imported[0]}`

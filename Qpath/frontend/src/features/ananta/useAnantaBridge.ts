@@ -15,10 +15,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { importAnantaSkills, parseAnantaProgress } from './importAnantaSkills';
-
-/** Ananta's local origin; override with VITE_ANANTA_ORIGIN if the ports move. */
-const anantaOrigin =
-  (import.meta.env.VITE_ANANTA_ORIGIN as string | undefined) || 'http://localhost:5500';
+import { anantaOrigin } from './anantaOrigin';
 
 /**
  * Create a per-effect promise chain so two progress messages arriving close
