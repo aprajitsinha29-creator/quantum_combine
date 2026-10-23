@@ -362,7 +362,7 @@ MANDATORY RULES:
     try {
       const controller = new AbortController();
       const tid = setTimeout(() => controller.abort(), 14000);
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-26b-a4b-it:generateContent?key=${geminiKey}`;
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -380,7 +380,9 @@ MANDATORY RULES:
 
       if (res.ok) {
         const data = await res.json();
-        const geminiText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const candidate = data?.candidates?.[0];
+        const nonThoughtParts = (candidate?.content?.parts || []).filter(p => !p.thought);
+        const geminiText = (nonThoughtParts.length > 0 ? nonThoughtParts.map(p => p.text).join('') : candidate?.content?.parts?.[0]?.text) || '';
         const parsed = extractJsonFromText(geminiText);
         if (parsed && Array.isArray(parsed.synthesis_paragraphs)) {
           return parsed;

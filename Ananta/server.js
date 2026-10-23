@@ -61,6 +61,7 @@ if (!GEMINI_API_KEY) {
       const match = configContent.match(/GEMINI_API_KEY:\s*["']([^"']+)["']/);
       if (match && match[1]) {
         GEMINI_API_KEY = match[1].trim();
+        process.env.GEMINI_API_KEY = GEMINI_API_KEY;
       }
     }
   } catch (e) {
@@ -162,14 +163,14 @@ function parseRequestBody(req) {
   });
 }
 
-// Call Google AI Studio (Gemini 2.5 Flash)
+// Call Google AI Studio (Gemma 4 26B A4B IT)
 async function callGeminiApi(prompt, systemInstruction = '', isJson = true, overrideKey = '') {
-  const activeKey = overrideKey || GEMINI_API_KEY;
+  const activeKey = overrideKey || GEMINI_API_KEY || process.env.GEMINI_API_KEY;
   if (!activeKey) {
     throw new Error('GEMINI_API_KEY not configured on backend');
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${activeKey}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-26b-a4b-it:generateContent?key=${activeKey}`;
   
   const payload = {
     contents: [
@@ -213,7 +214,8 @@ async function callGeminiApi(prompt, systemInstruction = '', isJson = true, over
 
     const data = await res.json();
     const candidate = data?.candidates?.[0];
-    const rawText = candidate?.content?.parts?.[0]?.text;
+    const nonThoughtParts = (candidate?.content?.parts || []).filter(p => !p.thought);
+    const rawText = (nonThoughtParts.length > 0 ? nonThoughtParts.map(p => p.text).join('') : candidate?.content?.parts?.[0]?.text) || '';
     if (!rawText) {
       throw new Error('Empty response from Google AI Studio');
     }
@@ -221,7 +223,7 @@ async function callGeminiApi(prompt, systemInstruction = '', isJson = true, over
     return {
       text: rawText,
       usage: data.usageMetadata || null,
-      modelVersion: data.modelVersion || 'gemini-2.5-flash',
+      modelVersion: data.modelVersion || 'gemma-4-26b-a4b-it',
       latencyMs,
       finishReason: candidate.finishReason || 'STOP'
     };
@@ -431,7 +433,7 @@ const server = http.createServer(async (req, res) => {
       timestamp: new Date().toISOString(),
       aiStudio: {
         provider: 'Google AI Studio',
-        model: 'gemini-2.5-flash',
+        model: 'gemma-4-26b-a4b-it',
         keyConfigured: Boolean(GEMINI_API_KEY && GEMINI_API_KEY.length > 10),
         status: GEMINI_API_KEY ? 'CONNECTED' : 'KEY_MISSING'
       },
@@ -866,7 +868,7 @@ Return ONLY a valid JSON object matching this schema:
       sendJson(res, 200, {
         ...result,
         aiAudit,
-        provider: aiAudit ? 'Google AI Studio (Gemini 2.5 Flash)' : 'Ananta Deterministic Compiler Core'
+        provider: aiAudit ? 'Google AI Studio (Gemma 4 26B A4B IT)' : 'Ananta Deterministic Compiler Core'
       });
       logTransaction('POST', pathname, 200, Date.now() - reqStart, {
         raw: result.rawGateCount,

@@ -52,6 +52,18 @@ function getGeminiKey(req) {
   if (env && env.trim().length > 10) return env.trim();
   const header = req && req.headers && req.headers['x-gemini-key'];
   if (header && header.length > 10) return String(header).trim();
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const cfgPath = path.join(__dirname, '..', '..', 'js', 'config.js');
+    if (fs.existsSync(cfgPath)) {
+      const match = fs.readFileSync(cfgPath, 'utf8').match(/GEMINI_API_KEY:\s*["']([^"']+)["']/);
+      if (match && match[1]) {
+        process.env.GEMINI_API_KEY = match[1].trim();
+        return process.env.GEMINI_API_KEY;
+      }
+    }
+  } catch (e) {}
   return '';
 }
 
@@ -95,7 +107,7 @@ async function listGeminiModels(apiKey, timeoutMs = 10000) {
     .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
     .map((m) => m.name.replace(/^models\//, ''));
   if (!usable.length) throw new Error('Gemini key exposes no generateContent models');
-  usable.sort((a, b) => rankModel(b, ['flash']) - rankModel(a, ['flash']));
+  usable.sort((a, b) => rankModel(b, ['gemma-4-26b-a4b-it', 'flash']) - rankModel(a, ['gemma-4-26b-a4b-it', 'flash']));
   _cache.geminiModels = usable;
   return usable;
 }
@@ -151,8 +163,10 @@ async function geminiGenerateOnce(apiKey, model, prompt, maxTokens, temperature,
 
   const data = await res.json();
   const candidate = data?.candidates?.[0];
+  const nonThoughtParts = (candidate?.content?.parts || []).filter((p) => !p.thought);
+  const text = (nonThoughtParts.length > 0 ? nonThoughtParts.map((p) => p.text).join('') : candidate?.content?.parts?.[0]?.text || '').trim();
   return {
-    text: (candidate?.content?.parts?.[0]?.text || '').trim(),
+    text,
     finishReason: candidate?.finishReason || null
   };
 }

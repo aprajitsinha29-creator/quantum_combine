@@ -61,7 +61,7 @@ class QuantumVoiceCopilot {
     });
 
     setTimeout(() => {
-      this._updateBadge(this.selectedProvider === 'grok' ? 'grok-2' : (this.selectedProvider === 'gemini' ? 'gemini-2.5-flash' : 'deterministic-quantum-ai'));
+      this._updateBadge(this.selectedProvider === 'grok' ? 'grok-2' : (this.selectedProvider === 'gemini' ? 'gemma-4-26b-a4b-it' : 'deterministic-quantum-ai'));
     }, 500);
   }
 
@@ -83,7 +83,7 @@ class QuantumVoiceCopilot {
   setProvider(provider) {
     this.selectedProvider = provider || 'auto';
     localStorage.setItem('ananta_ai_provider', this.selectedProvider);
-    this._updateBadge(this.selectedProvider === 'grok' ? 'grok-2' : (this.selectedProvider === 'gemini' ? 'gemini-2.5-flash' : 'deterministic-quantum-ai'));
+    this._updateBadge(this.selectedProvider === 'grok' ? 'grok-2' : (this.selectedProvider === 'gemini' ? 'gemma-4-26b-a4b-it' : 'deterministic-quantum-ai'));
     this._setActionFeedback(`Active AI provider set to: ${this.selectedProvider.toUpperCase()}`, true);
   }
 
@@ -130,7 +130,7 @@ class QuantumVoiceCopilot {
       });
       if (res.ok) {
         const info = await res.json();
-        const active = info.activeProvider || (info.providers?.grok?.available ? 'grok-2' : 'gemini-2.5-flash');
+        const active = info.activeProvider || (info.providers?.grok?.available ? 'grok-2' : 'gemma-4-26b-a4b-it');
         this._updateBadge(active);
         const grokMsg = info.providers?.grok?.available ? 'Grok-2 (Connected 🟢)' : 'Grok-2 (No Key)';
         const gemMsg = info.providers?.gemini?.available ? 'Gemini 2.5 (Ready 🟢)' : 'Gemini (Quota)';

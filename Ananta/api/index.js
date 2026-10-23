@@ -104,12 +104,12 @@ async function getParsedBody(req) {
 }
 
 async function callGeminiApi(prompt, systemInstruction = '', isJson = true, customKey = '') {
-  const activeKey = customKey || DEFAULT_GEMINI_KEY;
+  const activeKey = customKey || DEFAULT_GEMINI_KEY || process.env.GEMINI_API_KEY;
   if (!activeKey) {
     throw new Error('GEMINI_API_KEY is not configured on server. Set GEMINI_API_KEY in Vercel Project Settings or provide X-Gemini-Key header.');
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${activeKey}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-26b-a4b-it:generateContent?key=${activeKey}`;
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.2 }
@@ -144,7 +144,8 @@ async function callGeminiApi(prompt, systemInstruction = '', isJson = true, cust
 
     const data = await res.json();
     const candidate = data?.candidates?.[0];
-    const rawText = candidate?.content?.parts?.[0]?.text;
+    const nonThoughtParts = (candidate?.content?.parts || []).filter(p => !p.thought);
+    const rawText = (nonThoughtParts.length > 0 ? nonThoughtParts.map(p => p.text).join('') : candidate?.content?.parts?.[0]?.text) || '';
     if (!rawText) {
       throw new Error('Empty response from Google AI Studio');
     }
@@ -152,7 +153,7 @@ async function callGeminiApi(prompt, systemInstruction = '', isJson = true, cust
     return {
       text: rawText,
       usage: data.usageMetadata || null,
-      modelVersion: data.modelVersion || 'gemini-2.5-flash',
+      modelVersion: data.modelVersion || 'gemma-4-26b-a4b-it',
       latencyMs,
       finishReason: candidate.finishReason || 'STOP'
     };
@@ -379,7 +380,7 @@ module.exports = async function handler(req, res) {
       timestamp: new Date().toISOString(),
       aiStudio: {
         provider: 'Google AI Studio',
-        model: 'gemini-2.5-flash',
+        model: 'gemma-4-26b-a4b-it',
         keyConfigured: Boolean(DEFAULT_GEMINI_KEY && DEFAULT_GEMINI_KEY.length > 10),
         status: (DEFAULT_GEMINI_KEY && DEFAULT_GEMINI_KEY.length > 10) ? 'CONNECTED' : 'READY_FOR_KEY'
       },
@@ -812,7 +813,7 @@ Return ONLY a valid JSON object matching this schema:
       return sendJson(res, 200, {
         ...result,
         aiAudit,
-        provider: aiAudit ? 'Google AI Studio (Gemini 2.5 Flash)' : 'Ananta Deterministic Compiler Core'
+        provider: aiAudit ? 'Google AI Studio (Gemma 4 26B A4B IT)' : 'Ananta Deterministic Compiler Core'
       });
     } catch (err) {
       console.error('[Vercel API /api/transpiler/doctor Error]', err);

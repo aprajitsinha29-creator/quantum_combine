@@ -1345,8 +1345,8 @@ class TranspilerDoctor {
       const audit = data.result || data.audit;
       this.renderAuditResults(audit, {
         isLive: true,
-        provider: 'Google AI Studio (Gemini 2.5 Flash)',
-        model: data.source || 'gemini-2.5-flash'
+        provider: 'Google AI Studio (Gemma 4 26B A4B IT)',
+        model: data.source || 'gemma-4-26b-a4b-it'
       });
       if (typeof window.setStatusBadge === 'function') {
         window.setStatusBadge('doctor-status-badge', true);

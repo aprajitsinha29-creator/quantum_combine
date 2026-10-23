@@ -216,7 +216,7 @@ if (typeof window.ANANTA_CONFIG === 'undefined') {
           throw backendErr;
         }
 
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-26b-a4b-it:generateContent?key=${apiKey}`;
         const directRes = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -231,7 +231,9 @@ if (typeof window.ANANTA_CONFIG === 'undefined') {
         }
 
         const directData = await directRes.json();
-        const replyText = directData?.candidates?.[0]?.content?.parts?.[0]?.text || 'No response';
+        const candidate = directData?.candidates?.[0];
+        const nonThoughtParts = (candidate?.content?.parts || []).filter(p => !p.thought);
+        const replyText = (nonThoughtParts.length > 0 ? nonThoughtParts.map(p => p.text).join('') : candidate?.content?.parts?.[0]?.text) || 'No response';
         const latency = Math.round(performance.now() - startTime);
 
         const result = {
@@ -239,7 +241,7 @@ if (typeof window.ANANTA_CONFIG === 'undefined') {
           reply: replyText.trim(),
           metadata: {
             provider: 'Google AI Studio (Client Direct)',
-            model: 'gemini-2.5-flash',
+            model: 'gemma-4-26b-a4b-it',
             latencyMs: latency
           }
         };

@@ -56,6 +56,16 @@ function getApiKey(req) {
   if (req && req.headers && req.headers['x-gemini-key'] && req.headers['x-gemini-key'].length > 10) {
     return req.headers['x-gemini-key'].trim();
   }
+  try {
+    const cfgPath = path.join(__dirname, '..', 'js', 'config.js');
+    if (fs.existsSync(cfgPath)) {
+      const match = fs.readFileSync(cfgPath, 'utf8').match(/GEMINI_API_KEY:\s*["']([^"']+)["']/);
+      if (match && match[1]) {
+        process.env.GEMINI_API_KEY = match[1].trim();
+        return process.env.GEMINI_API_KEY;
+      }
+    }
+  } catch (e) {}
   return '';
 }
 
@@ -139,7 +149,7 @@ async function resolveGeminiModels(apiKey) {
 
   if (!usable.length) throw new Error('Gemini key has no models supporting generateContent');
 
-  usable.sort((a, b) => rankModel(b, ['flash']) - rankModel(a, ['flash']));
+  usable.sort((a, b) => rankModel(b, ['gemma-4-26b-a4b-it', 'flash']) - rankModel(a, ['gemma-4-26b-a4b-it', 'flash']));
   _modelCache.geminiList = usable;
   return usable;
 }
@@ -268,7 +278,9 @@ async function callGeminiOnce(apiKey, model, systemPrompt, userText) {
     }
 
     const data = await response.json();
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const candidate = data?.candidates?.[0];
+    const nonThoughtParts = (candidate?.content?.parts || []).filter(p => !p.thought);
+    const rawText = (nonThoughtParts.length > 0 ? nonThoughtParts.map(p => p.text).join('') : candidate?.content?.parts?.[0]?.text) || '';
     if (!rawText) throw new Error('Empty text from Gemini');
 
     const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -286,6 +298,9 @@ async function callGeminiOnce(apiKey, model, systemPrompt, userText) {
  * offline. The model that works is remembered for subsequent calls.
  */
 async function callGeminiDirect(apiKey, systemPrompt, userText) {
+  if (apiKey && !process.env.GEMINI_API_KEY) {
+    process.env.GEMINI_API_KEY = apiKey;
+  }
   // Delegates to the shared provider layer (ananta-backend/utils/aiProvider.js)
   // so the tutor gets the same runtime model discovery, wider rotation and
   // response cache as every other AI feature. The free tier caps requests per
